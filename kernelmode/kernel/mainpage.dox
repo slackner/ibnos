@@ -54,11 +54,17 @@
  *	and leave everything else to its default values.
  *
  *	When you start the VM, you should get directly to the desktop of Lubuntu.
- *	Now open a terminal, use "cd ibnos" to switch to the "ibnos" folder and type "make"
- *	to create the iso image file. You can also use the "make" command
- *	at any time later if you have changed something and want to rebuild the VM image.
- *	Now run "boch -f bochs.cfg" and you should see IBNOS doing its work. For more
- *	information about these commands take a look at the following sections.
+ *	Now open a terminal, change to the "ibnos" folder with "cd" and type the
+ *	following commands to update the code to the newest version, create the
+ *	iso image and start the OS in a VM:
+\verbatim
+git pull
+make
+boch -f bochs.cfg
+\endverbatim
+ *	You should now see IBNOS doing its work.
+ *	For more information about these commands take a look at the following
+ *	sections.
  *
  *	IBNOS is split across several files which represent self-containing units
  *	of the OS like threads or memory. We therefore recommend to use an editor
@@ -199,7 +205,9 @@ cd ../..
  *
  * IBNOS uses a system to automatically generate Makefiles from within
  * the Makefile itself. This makes it possible to add new files or
- * includes without worrying about changing Makefile entries. If you
+ * includes without worrying about changing Makefile entries. A simple
+ * call to "make" should always create an up to date iso file
+ * (or "make doc" to update the html documentation). If you
  * want to add a new directory, simply copy a Makefile from a different
  * directory with the same directory depth (or correct the path to the
  * config.mk file manually). Now you should know everything you need
