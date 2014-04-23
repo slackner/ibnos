@@ -122,7 +122,7 @@ cd ../..
  *	The next step is to download the source code for the operating system itself.
  *	The easiest way is to use git to clone our repository and you have everything you need:
  *
- *	\verbatim git clone git clone https://bitbucket.org/mmueller2012/ibnos.git \endverbatim
+ *	\verbatim git clone https://bitbucket.org/mmueller2012/ibnos.git \endverbatim
  *	Now change to the ibnos directory and run "make". After some seconds you should
  *	get a file called ibnos.iso which can be booted in a VM. You can use the "make" command
  *	at any time if you have changed something and want to rebuild the VM image.
