@@ -267,7 +267,7 @@ uint32_t processInfo(struct processInfo *info, uint32_t count)
 	if (count)
 	{
 		/* let the paging module fill out all memory related fields */
-		pagingFillProcessInfo(p, info);
+		pagingFillProcessInfo(NULL, info);
 
 		/* fill out all other fields */
 		info->processID					= 0;
