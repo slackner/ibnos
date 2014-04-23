@@ -1,0 +1,232 @@
+/**
+ * \mainpage IBNOS Documentation
+ * \section Introduction
+ * IBNOS is a research operating system written by Michael Müller and
+ * Sebstian Lackner to demonstrate how the basics of x86 operating systems work.
+ * The focus of the development lies on the kernel which is still in its early
+ * beta stage but already supports the following features:
+ *
+ *	- Physical memory management
+ *	- Paging
+ *	- Memory allocator (heap)
+ *	- Interrupts and IRQs
+ *	- Text output
+ *	- Keyboard input
+ *	- Multiprocessing
+ *	- Multithreading
+ *	- Round Robin scheduling
+ *	- Pipes
+ *	- Semaphores
+ *	- Events
+ *	- Loading of static ELF executables
+ *
+ *	The aim is to provide easy to understand and extendable code - not reaching 
+ *	the best performance or to compete with real-world operating systems. Although
+ *	the feature set is still quite limited, the kernel already has some unique features,
+ *	for example all handles are represented as an object for which you can wait.
+ *	This makes it possible to write programs in a very efficient way as you can
+ *	wait for threads, pipes, keyboard input or processes with just a single syscall.
+ *
+ *	To make testing easier IBNOS also contains a user land part consisting of a
+ *	C library, some wrappers for syscalls and a tiny shell. This should make 
+ *	it easier to port POSIX applications in the future.
+ *
+ *	\section Installing Installation Instructions
+ *	To be able to build the kernel and the userland you need a cross compiler.
+ *	As this might be a bit complicated for someone starting with OS development,
+ *	we also provide a prepared VM image with all required tools directly for download.
+ *	Alternatively you can also follow the instructions for installing and
+ *	compiling everything on your own. The instructions are targeting Debian
+ *	based systems like Ubuntu / Linux Mint, but should also apply to any other
+ *	linux distribution, you just need to replace the package names and package
+ *	manager command.
+ *
+ *	\subsection VM 1. Developing within the VM Image
+ *	We provide a hard disk image for VirtualBox which you can download
+ *  <a href="http://repos.fds-team.de/ibnos/ibnos-vbox-1.zip"><b>here</b></a>.
+ *	It contains a Lubuntu 14.04 installation with all required utilities and
+ *	files. The username and password is "ibnos", though you will only need
+ *	it if you want to install additional software.
+ *
+ *	To use the image in VirtualBox simply create a new VM and select Ubuntu
+ *	as Operating System. When VirtualBox asks you whether you want to create
+ *	a new harddisk, select the downloaded image file (after extracting it)
+ *	and leave everything else to its default values.
+ *
+ *	When you start the VM, you should get directly to the desktop of Lubuntu.
+ *	Now open a terminal, use "cd ibnos" to switch to the "ibnos" folder and type "make"
+ *	to create the iso image file. You can also use the "make" command
+ *	at any time later if you have changed something and want to rebuild the VM image.
+ *	Now run "boch -f bochs.cfg" and you should see IBNOS doing its work. For more
+ *	information about these commands take a look at the following sections.
+ *
+ *	IBNOS is split across several files which represent self-containing units
+ *	of the OS like threads or memory. We therefore recommend to use an editor
+ *	which shows a list of files in the sidebar so that you can easily switch
+ *	between them. One example for such an editor is Geany (which is already
+ *	preinstalled), but feel free to use a different one.
+ *
+ *	\subsection LINUX 2. Installing development tools directly on Linux (Debian/Ubuntu/Mint)
+ *	Before you can start you need to install some basic build utilities like
+ *	gcc or make plus the build dependencies for the cross compiler itself.
+ *	After you've successfully build your compiler, you also need some tools like 
+ *	doxygen for creating a html documentation or mkisofs to create a bootable
+ *	iso file. We also recommend to download the source code of the OS via git.
+ *	On Debian based systems you can install the necessary packages with the
+ *	following command:
+ *
+\verbatim
+sudo apt-get install build-essential bison flex libgmp-dev libmpfr-dev libmpc-dev git doxygen genisoimage
+\endverbatim
+ *	Now simply execute the following commands (don't copy&paste multiple lines at the same time!)
+ *	to compile and install gcc to your home directory:
+\verbatim
+export PREFIX="$HOME/opt/cross"
+export TARGET=i586-elf
+export PATH="$PREFIX/bin:$PATH"
+
+# Create working directory
+mkdir cross
+cd cross
+
+# Binutils
+wget http://ftp.gnu.org/gnu/binutils/binutils-2.24.tar.gz
+tar -xf binutils-2.24.tar.gz
+mkdir build-binutils
+cd build-binutils
+../binutils-2.24/configure --target=$TARGET --prefix="$PREFIX" --disable-nls
+make
+make install
+cd ..
+
+# GCC
+wget ftp://ftp.fu-berlin.de/unix/languages/gcc/releases/gcc-4.8.2/gcc-4.8.2.tar.bz2
+tar -xf gcc-4.8.2.tar.bz2
+mkdir build-gcc
+cd build-gcc
+../gcc-4.8.2/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
+make all-gcc -j4
+make all-target-libgcc -j4
+make install-gcc
+make install-target-libgcc
+cd ../..
+\endverbatim
+ *	If everything worked as expected you can delete the "cross" directory. The
+ *	compiled files should now be placed under ~/opt/cross inside your home
+ *	directory. Whenever you want to use the compiler, i.e when building the OS,
+ *	you must first execute:
+ *
+ *	\verbatim export PATH="$HOME/opt/cross/bin:$PATH" \endverbatim
+ *	Alternatively, you can also add the command to your .bashrc.
+ *
+ *	The next step is to download the source code for the operating system itself.
+ *	The easiest way is to use git to clone our repository and you have everything you need:
+ *
+ *	\verbatim git clone git clone https://bitbucket.org/mmueller2012/ibnos.git \endverbatim
+ *	Now change to the ibnos directory and run "make". After some seconds you should
+ *	get a file called ibnos.iso which can be booted in a VM. You can use the "make" command
+ *	at any time if you have changed something and want to rebuild the VM image.
+ *
+ * \section Booting Booting the OS in a VM
+ * The generated ISO file can now be plugged into a VM or a real machine. We
+ * recommend to test it in a VM, as it is (although extremely unlikely) not impossible
+ * to destroy your hardware by sending malformed data to it.
+ *
+ * There are a lot of different x86 emulators out there, but Bochs and Qemu are better
+ * suited for OS development then the usual ones (Virtualbox, VMware, ...)
+ * since they support emulating a x86 CPU in software. This gives additional
+ * debugging possibilities and moreover Bochs shows some additional information
+ * when you manage to trigger a fatal error.
+ *
+ * On Debian based systems you can install both programs with the following
+ * commands:
+ *
+ * \verbatim sudo apt-get install bochs-sdl qemu-system \endverbatim
+ *
+ * These programs are already preinstalled in the ready-to-use VM.
+ *
+ * Now you can use the following commands to start IBNOS in a VM (You
+ * must be inside the source directory!):
+ *
+ * Bochs:
+ * \verbatim bochs -f bochs.cfg\endverbatim
+ *
+ * Qemu:
+ * \verbatim qemu-system-i386 -m 128 -cdrom ibnos.iso -boot c \endverbatim
+ *
+ * After pressing enter / return in the Bootloader the OS should start.
+ *
+ * \section HowOs How the OS works
+ * The Kernel will perform the following steps when the system is booted
+ *
+ * -# collect information about the physical memory
+ * -# initialize console / text output
+ * -# load a font supporting latin1 characters
+ * -# enable paging
+ * -# initialize the Global Descriptor Table
+ * -# initialize the FPU
+ * -# set frequency of the Programmable Interval Timer
+ * -# initialize the Programmable Interrupt Controller
+ * -# enable the keyboard
+ * -# load the init process and switch to it
+ *
+ * For more information about these steps and the rest of the OS, please
+ * take a look at the according modules:
+ *
+ * - \ref console
+ * - \ref GDT
+ * - \ref PIT
+ * - \ref PIC
+ * - \ref Keyboard
+ * - \ref ELF
+ *
+ * Afterwards the main purpose of this (and also any other) operating system is
+ * to provide a set of syscalls, which allows user mode applications to interact
+ * with the hardware in an abstract way. User mode applications don't have to care
+ * about the total amount of memory in the system or how to isolate different tasks
+ * from each other - this is all done transparently by the operating system.
+ *
+ * The concepts currently available for usermode applications are:
+ * - \ref Processes
+ * - \ref Threads
+ * - \ref Pipes
+ * - \ref Semaphores
+ * - \ref Events
+ *
+ * For a more complete list, take a look at the modules page!
+ *
+ * \section Development
+ *
+ * IBNOS uses a system to automatically generate Makefiles from within
+ * the Makefile itself. This makes it possible to add new files or
+ * includes without worrying about changing Makefile entries. If you
+ * want to add a new directory, simply copy a Makefile from a different
+ * directory with the same directory depth (or correct the path to the
+ * config.mk file manually). Now you should know everything you need
+ * to add files and start altering the kernel. In case you never worked
+ * on an OS so far, here are some things you need to pay attention to:
+ *
+ * - There is no C library in the kernel, i.e. no printf() or strdup(). <br>
+ *   You need to write all these functions on your own if you want to use them.
+ *   There are only a few compiler provided files like <stdint.h> which you can
+ *   use, all other includes will result in an error since they can not be found.
+ *   <br><br>
+ * - Don't try to use floating point operations in the kernel. <br>
+ *   Each computer has only one floating point unit and it is very time intensive
+ *   to switch between different FPU contexts. To prevent unnecessary switches the
+ *   kernel itself doesn't use the FPU at all. If you try to use float / double values
+ *   or numbers like "2.0" you will most likely get a system failure.
+ *   <br><br>
+ * - Exception handling inside the kernel is difficult. <br>
+ *   In case you do something wrong inside the kernel it is not always possible
+ *   to recover from this situation. The kernel either did not yet tell the CPU
+ *   what to do when an exceptions occurs or you broke the kernel in a way that
+ *   it cannot execute the code of the exception handler any more. In this
+ *   case you get a "double fault" and if the kernel can still not handle this
+ *   (which is very likely), you will get a triple fault which will result in a
+ *   reset of the complete system. If the operating system simply reboots without any
+ *   interaction, you know that you did something completely wrong (or triggered a
+ *   kernel bug).
+ *
+ * This said, we wish you much fun hacking on our code :-)
+ */

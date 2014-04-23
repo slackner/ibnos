@@ -1,0 +1,6 @@
+default 0
+
+title IBN OS
+	kernel /boot/ibnos.kernel
+	module /boot/init.user
+	boot
