@@ -174,6 +174,7 @@ void processScancode(int extended, uint8_t scanCode, bool keyUp)
 
 			case KEY_MODIFIER_ALT:
 				keyEv.modifiers.alt = keyEv.pressed;
+				break;
 
 			case KEY_MODIFIER_ALTGR:
 				keyEv.modifiers.altgr = keyEv.pressed;
