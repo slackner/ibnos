@@ -235,7 +235,7 @@ uint32_t interrupt_0x80(UNUSED uint32_t interrupt, UNUSED uint32_t error, struct
 			break;
 
 		case SYSCALL_GET_PROCESS_INFO:
-			if (ACCESS_USER_MEMORY(&k, p, (void *)t->task.ebx, t->task.ecx * sizeof(struct processInfo), true))
+			if (ACCESS_USER_MEMORY_STRUCT(&k, p, (void *)t->task.ebx, t->task.ecx, sizeof(struct processInfo), true))
 			{
 				t->task.eax = processInfo((struct processInfo *)k.addr, t->task.ecx);
 				RELEASE_USER_MEMORY(&k);

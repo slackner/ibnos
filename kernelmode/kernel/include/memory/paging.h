@@ -127,6 +127,13 @@
 		return (k->addr != NULL);
 	}
 
+	static inline bool ACCESS_USER_MEMORY_STRUCT(struct userMemory *k, struct process *p, void *src_addr, uint32_t count, uint32_t struct_length, bool rw)
+	{
+		uint64_t byte_length = (uint64_t)count * struct_length;
+		if ((byte_length >> 32) != 0) return false;
+		return ACCESS_USER_MEMORY(k, p, src_addr, byte_length, rw);
+	}
+
 	static inline void RELEASE_USER_MEMORY(struct userMemory *k)
 	{
 		if (k->addr) pagingReleasePhysMem(NULL, k->addr, k->length);
