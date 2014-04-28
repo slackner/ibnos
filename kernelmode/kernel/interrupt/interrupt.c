@@ -449,7 +449,7 @@ uint32_t interrupt_0x80(UNUSED uint32_t interrupt, UNUSED uint32_t error, struct
 			break;
 
 		case SYSCALL_CONSOLE_WRITE_RAW:
-			if (ACCESS_USER_MEMORY(&k, p, (void *)t->task.ebx, t->task.ecx * sizeof(uint16_t), true))
+			if (ACCESS_USER_MEMORY_STRUCT(&k, p, (void *)t->task.ebx, t->task.ecx, sizeof(uint16_t), true))
 			{
 				consoleWriteRawLen(k.addr, t->task.ecx);
 				RELEASE_USER_MEMORY(&k);
