@@ -497,29 +497,66 @@ uint32_t interrupt_0x80(UNUSED uint32_t interrupt, UNUSED uint32_t error, struct
 			t->task.eax = consoleGetFlags();
 			break;
 
-		case SYSCALL_FILE_SEARCH:
-			if (ACCESS_USER_MEMORY(&k, p, (void *)t->task.ebx, t->task.ecx, true))
+		case SYSCALL_FILESYSTEM_SEARCH_FILE:
 			{
-				struct file *new_f = fileSystemSearchFile(NULL, k.addr, t->task.ecx, t->task.edx);
-				if (new_f)
+				struct directory *directory = fileSystemIsValidDirectory(handleGet(&p->handles, t->task.ebx));
+				if (ACCESS_USER_MEMORY(&k, p, (void *)t->task.ecx, t->task.edx, true))
 				{
-					t->task.eax = handleAllocate(&p->handles, &new_f->obj);
-					objectRelease(new_f);
+					struct file *new_f = fileSystemSearchFile(directory, k.addr, t->task.edx, t->task.esi);
+					if (new_f)
+					{
+						t->task.eax = handleAllocate(&p->handles, &new_f->obj);
+						objectRelease(new_f);
+					}
 				}
 			}
 			break;
 
-		case SYSCALL_FILE_OPEN:
+		case SYSCALL_FILESYSTEM_SEARCH_DIRECTORY:
 			{
-				struct openedFile *new_h;
-				struct file *f = fileSystemIsValidFile(handleGet(&p->handles, t->task.ebx));
-				if (!f) break;
-
-				new_h = fileOpen(f);
-				if (new_h)
+				struct directory *directory = fileSystemIsValidDirectory(handleGet(&p->handles, t->task.ebx));
+				if (ACCESS_USER_MEMORY(&k, p, (void *)t->task.ecx, t->task.edx, true))
 				{
-					t->task.eax = handleAllocate(&p->handles, &new_h->obj);
-					objectRelease(new_h);
+					struct directory *new_d = fileSystemSearchDirectory(directory, k.addr, t->task.edx, t->task.esi);
+					if (new_d)
+					{
+						t->task.eax = handleAllocate(&p->handles, &new_d->obj);
+						objectRelease(new_d);
+					}
+				}
+			}
+			break;
+
+		case SYSCALL_FILESYSTEM_OPEN:
+			{
+				struct file *f;
+				struct directory *d;
+				struct object *obj = handleGet(&p->handles, t->task.ebx);
+
+				/* if the argument is a file object */
+				f = fileSystemIsValidFile(obj);
+				if (f)
+				{
+					struct openedFile *new_h = fileOpen(f);
+					if (new_h)
+					{
+						t->task.eax = handleAllocate(&p->handles, &new_h->obj);
+						objectRelease(new_h);
+					}
+					break;
+				}
+
+				/* if the argument is a directory object */
+				d = fileSystemIsValidDirectory(obj);
+				if (d)
+				{
+					struct openedDirectory *new_h = directoryOpen(d);
+					if (new_h)
+					{
+						t->task.eax = handleAllocate(&p->handles, &new_h->obj);
+						objectRelease(new_h);
+					}
+					break;
 				}
 			}
 			break;

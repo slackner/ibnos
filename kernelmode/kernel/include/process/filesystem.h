@@ -45,7 +45,8 @@
 		struct object obj;
 		struct directory *parent;
 		char *name;
-		bool deleted;
+
+		struct linkedList openedDirectories;
 
 		struct linkedList files;
 		struct linkedList directories;
@@ -56,13 +57,20 @@
 		struct object obj;
 		struct directory *parent;
 		char *name;
-		bool deleted;
 
 		struct linkedList openedFiles;
 
 		bool isHeap;
 		uint8_t *buffer;
 		uint32_t size;
+	};
+
+	struct openedDirectory
+	{
+		struct object obj;
+		struct directory *directory;
+
+		struct object *pos;
 	};
 
 	struct openedFile
@@ -74,8 +82,10 @@
 	};
 
 	struct directory *directoryCreate(struct directory *parent, char *name, uint32_t nameLength);
-	struct file *fileCreate(struct directory *parent, char *name, uint32_t nameLength, uint8_t *heapBuffer, uint32_t heapSize);
+	struct file *fileCreate(struct directory *parent, char *name, uint32_t nameLength, uint8_t *staticBuffer, uint32_t staticSize);
+
 	struct openedFile *fileOpen(struct file *file);
+	struct openedDirectory *directoryOpen(struct directory *directory);
 
 	void fileSystemInit();
 
@@ -83,6 +93,8 @@
 	struct file *fileSystemIsValidFile(struct object *obj);
 
 	struct directory *fileSystemGetRoot();
+
+	struct directory *fileSystemSearchDirectory(struct directory *directory, char *path, uint32_t pathLength, bool create);
 	struct file *fileSystemSearchFile(struct directory *directory, char *path, uint32_t pathLength, bool create);
 
 #endif

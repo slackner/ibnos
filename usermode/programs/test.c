@@ -443,6 +443,152 @@ DECLARE_TEST_FUNC(event)
 	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, event));
 }
 
+DECLARE_TEST_FUNC(filesystem)
+{
+	static const char path1[] = "/etc/passwd";
+	static const char str1[] = "Some data for the passwd file";
+
+	static const char path2[] = "/home/user/testfile";
+	static const char str2[] = "Testdata";
+
+	int32_t file, dir, handle, handle2, handle3, handle4;
+	char buf[64];
+
+	/* Write str1 in path1 */
+	file = ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_FILE, -1, (uint32_t)path1, sizeof(path1), 1);
+	ok(file >= 0);
+
+	handle = ibnos_syscall(SYSCALL_FILESYSTEM_OPEN, file);
+	ok(handle >= 0);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_WRITE, handle, (uint32_t)str1, sizeof(str1)-1) == sizeof(str1)-1);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, handle));
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, file));
+
+	/* Write str2 in path2 */
+	file = ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_FILE, -1, (uint32_t)path2, sizeof(path2), 1);
+	ok(file >= 0);
+
+	handle = ibnos_syscall(SYSCALL_FILESYSTEM_OPEN, file);
+	ok(handle >= 0);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_WRITE, handle, (uint32_t)str2, sizeof(str2)-1) == sizeof(str2)-1);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, handle));
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, file));
+
+	/* Enumerate directory content (recursive) */
+	dir = ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_DIRECTORY, -1, 0, 0, 0);
+	ok(dir >= 0);
+
+	handle = ibnos_syscall(SYSCALL_FILESYSTEM_OPEN, dir);
+	ok(handle >= 0);
+
+	buf[0] = 0;
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, sizeof(buf)) != -1);
+	ok(strcmp(buf, "etc") == 0);
+
+	buf[0] = 0;
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, sizeof(buf)) != -1);
+	ok(strcmp(buf, "home") == 0);
+
+	handle2 = ibnos_syscall(SYSCALL_FILESYSTEM_OPEN, handle);
+	ok(handle2 >= 0);
+
+	buf[0] = 0;
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle2, (uint32_t)buf, sizeof(buf)) != -1);
+	ok(strcmp(buf, "user") == 0);
+
+	handle3 = ibnos_syscall(SYSCALL_FILESYSTEM_OPEN, handle2);
+	ok(handle3 >= 0);
+
+	buf[0] = 0;
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle3, (uint32_t)buf, sizeof(buf)) != -1);
+	ok(strcmp(buf, "testfile") == 0);
+
+	handle4 = ibnos_syscall(SYSCALL_FILESYSTEM_OPEN, handle3);
+	ok(handle4 >= 0);
+
+	buf[0] = 0;
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle4, (uint32_t)buf, sizeof(buf)) != -1);
+	ok(strcmp(buf, str2) == 0);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle4, (uint32_t)buf, sizeof(buf)) == -1);
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, handle4));
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle3, (uint32_t)buf, sizeof(buf)) == -1);
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, handle3));
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle2, (uint32_t)buf, sizeof(buf)) == -1);
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, handle2));
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, sizeof(buf)) == -1);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, handle));
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, dir));
+
+	/* Delete file */
+	file = ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_FILE, -1, (uint32_t)path1, sizeof(path1), 0);
+	ok(file >= 0);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_SHUTDOWN, file, 0));
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, file));
+
+	/* Search again */
+	file = ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_FILE, -1, (uint32_t)path1, sizeof(path1), 0);
+	ok(file == -1);
+
+	/* Partially read/write a file */
+	file = ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_FILE, -1, (uint32_t)path1, sizeof(path1), 1);
+	ok(file >= 0);
+
+	handle = ibnos_syscall(SYSCALL_FILESYSTEM_OPEN, file);
+	ok(handle >= 0);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, sizeof(buf)) == -1);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_WRITE, handle, (uint32_t)str1, sizeof(str1)-1) == sizeof(str1)-1);
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, sizeof(buf)) == -1);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_WRITE, handle, (uint32_t)str2, sizeof(str2)-1) == sizeof(str2)-1);
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, sizeof(buf)) == -1);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_SIGNAL, handle, 0));
+
+	memset(buf, 0, sizeof(buf));
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, 4) == 4);
+	ok(strcmp(buf, "Some") == 0);
+
+	memset(buf, 0, sizeof(buf));
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, 4) == 4);
+	ok(strcmp(buf, " dat") == 0);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_SIGNAL, handle, sizeof(str1)-1));
+
+	memset(buf, 0, sizeof(buf));
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, 4) == 4);
+	ok(strcmp(buf, "Test") == 0);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_GET_STATUS, handle, 0) == sizeof(str1)-1 + sizeof(str2)-1);
+	ok(ibnos_syscall(SYSCALL_OBJECT_GET_STATUS, handle, 1) == sizeof(str1)-1 + 4);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_SHUTDOWN, handle, 0));
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_GET_STATUS, handle, 0) == sizeof(str1)-1 + 4);
+	ok(ibnos_syscall(SYSCALL_OBJECT_GET_STATUS, handle, 1) == sizeof(str1)-1 + 4);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_SIGNAL, handle, 0));
+
+	memset(buf, 0, sizeof(buf));
+	ok(ibnos_syscall(SYSCALL_OBJECT_READ, handle, (uint32_t)buf, 4) == 4);
+	ok(strcmp(buf, "Some") == 0);
+
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, handle));
+	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, file));
+}
+
 int cmdTest(UNUSED char **argv, UNUSED int argc)
 {
 	__failureSemaphore = ibnos_syscall(SYSCALL_CREATE_SEMAPHORE, 0);
@@ -453,6 +599,7 @@ int cmdTest(UNUSED char **argv, UNUSED int argc)
 	test_pipe();
 	test_timer();
 	test_event();
+	test_filesystem();
 
 	printf("All tests finished.\n");
 	exit(0);

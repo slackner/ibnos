@@ -42,7 +42,7 @@ struct directory *fileSystemRoot;
 
 static void __directoryDestroy(struct object *obj);
 static void __directoryShutdown(struct object *obj, UNUSED uint32_t mode);
-static int32_t __directoryWrite(struct object *obj, UNUSED uint8_t *buf, UNUSED uint32_t length);
+static int32_t __directoryWrite(struct object *obj, uint8_t *buf, uint32_t length);
 static int32_t __directoryRead(struct object *obj, uint8_t *buf, uint32_t length);
 
 static const struct objectFunctions directoryFunctions =
@@ -62,7 +62,7 @@ static const struct objectFunctions directoryFunctions =
 static void __fileDestroy(struct object *obj);
 static void __fileShutdown(struct object *obj, UNUSED uint32_t mode);
 static int32_t __fileGetStatus(struct object *obj, UNUSED uint32_t mode);
-static int32_t __fileWrite(struct object *obj, UNUSED uint8_t *buf, UNUSED uint32_t length);
+static int32_t __fileWrite(struct object *obj, uint8_t *buf, uint32_t length);
 static int32_t __fileRead(struct object *obj, uint8_t *buf, uint32_t length);
 
 static const struct objectFunctions fileFunctions =
@@ -79,7 +79,25 @@ static const struct objectFunctions fileFunctions =
 	NULL, /* remove */
 };
 
+static void __openedDirectoryDestroy(struct object *obj);
+static int32_t __openedDirectoryRead(struct object *obj, uint8_t *buf, uint32_t length);
+
+static const struct objectFunctions openedDirectoryFunctions =
+{
+	__openedDirectoryDestroy,
+	NULL, /* getMinHandle */
+	NULL, /* shutdown */
+	NULL, /* getStatus */
+	NULL, /* wait */
+	NULL, /* signal */
+	NULL, /* write */
+	__openedDirectoryRead,
+	NULL, /* insert */
+	NULL, /* remove */
+};
+
 static void __openedFileDestroy(struct object *obj);
+static void __openedFileShutdown(struct object *obj, UNUSED uint32_t mode);
 static int32_t __openedFileGetStatus(struct object *obj, uint32_t mode);
 static void __openedFileSignal(struct object *obj, uint32_t result);
 static int32_t __openedFileWrite(struct object *obj, uint8_t *buf, uint32_t length);
@@ -89,7 +107,7 @@ static const struct objectFunctions openedFileFunctions =
 {
 	__openedFileDestroy,
 	NULL, /* getMinHandle */
-	NULL, /* shutdown */
+	__openedFileShutdown,
 	__openedFileGetStatus,
 	NULL, /* wait */
 	__openedFileSignal,
@@ -98,6 +116,51 @@ static const struct objectFunctions openedFileFunctions =
 	NULL, /* insert */
 	NULL, /* remove */
 };
+
+static inline void __directoryShutdownChilds(struct directory *directory)
+{
+	struct file *f, *__f;
+	struct directory *d, *__d;
+
+	LL_FOR_EACH_SAFE(f, __f, &directory->files, struct file, obj.entry)
+	{
+		objectShutdown(f, 0);
+	}
+
+	LL_FOR_EACH_SAFE(d, __d, &directory->directories, struct directory, obj.entry)
+	{
+		objectShutdown(d, 0);
+	}
+}
+
+static inline bool __isValidFilename(struct object *current, struct directory *parent, const char *buf, uint32_t length)
+{
+	struct file *cur_f;
+	struct directory *cur_d;
+
+	/* reserved names cannot be a filename */
+	if (stringIsEqual(".", (char *)buf, length) || stringIsEqual("..", (char *)buf, length))
+		return false;
+
+	if (!parent)
+		return true;
+
+	/* check collision with other filenames */
+	LL_FOR_EACH(cur_f, &parent->files, struct file, obj.entry)
+	{
+		if (&cur_f->obj != current && stringIsEqual(cur_f->name, (char *)buf, length))
+			return false;
+	}
+
+	/* check collision with directory names */
+	LL_FOR_EACH(cur_d, &parent->directories, struct directory, obj.entry)
+	{
+		if (&cur_d->obj != current && stringIsEqual(cur_d->name, (char *)buf, length))
+			return false;
+	}
+
+	return true;
+}
 
 /**
  * @brief Creates a new kernel directory object
@@ -133,18 +196,16 @@ struct directory *directoryCreate(struct directory *parent, char *name, uint32_t
 	__objectInit(&d->obj, &directoryFunctions);
 	d->parent	= parent;
 	d->name		= buffer;
-	d->deleted	= false;
+	ll_init(&d->openedDirectories);
+
 	ll_init(&d->files);
 	ll_init(&d->directories);
 
 	if (parent)
 	{
 		ll_add_tail(&parent->directories, &d->obj.entry);
-		objectAddRef(parent);
+		objectAddRef(d);
 	}
-
-	/* make it persistent */
-	objectAddRef(d);
 
 	return d;
 }
@@ -157,14 +218,13 @@ struct directory *directoryCreate(struct directory *parent, char *name, uint32_t
 static void __directoryDestroy(struct object *obj)
 {
 	struct directory *d = objectContainer(obj, struct directory, &directoryFunctions);
-	struct directory *parent = d->parent;
-	assert(parent);
 
-	/* unlink from the parent directory */
-	ll_remove(&d->obj.entry);
+	/* at this point there shouldn't be any parent directory anymore */
+	assert(!d->parent);
 
-	/* there should be no more files for this directory */
-	assert(ll_empty(&d->files));
+	/* delete child elements (if any) */
+	__directoryShutdownChilds(d);
+	assert(ll_empty(&d->files) && ll_empty(&d->directories));
 
 	/* free the memory containing the name */
 	if (d->name) heapFree(d->name);
@@ -172,9 +232,6 @@ static void __directoryDestroy(struct object *obj)
 	/* release directory memory */
 	d->obj.functions = NULL;
 	heapFree(d);
-
-	/* decrement the refcount of the parent object */
-	objectRelease(parent);
 }
 
 /**
@@ -187,9 +244,13 @@ static void __directoryShutdown(struct object *obj, UNUSED uint32_t mode)
 {
 	struct directory *d = objectContainer(obj, struct directory, &directoryFunctions);
 
-	if (!d->deleted)
+	if (d->parent)
 	{
-		d->deleted = true;
+		/* unlink from the parent directory */
+		ll_remove(&d->obj.entry);
+		d->parent = NULL;
+
+		/* release object */
 		objectRelease(d);
 	}
 }
@@ -202,36 +263,15 @@ static void __directoryShutdown(struct object *obj, UNUSED uint32_t mode)
  * @param length Length of the new name
  * @return Number of bytes written (without null characters) or (-1) on error
  */
-static int32_t __directoryWrite(struct object *obj, UNUSED uint8_t *buf, UNUSED uint32_t length)
+static int32_t __directoryWrite(struct object *obj, uint8_t *buf, uint32_t length)
 {
 	struct directory *d = objectContainer(obj, struct directory, &directoryFunctions);
 
 	/* get rid of nullterminating character at the end of the filename */
 	while (length > 0 && !buf[length - 1]) length--;
 
-	if (length && d->parent)
-	{
-		struct file *cur_f;
-		struct directory *cur_d;
-
-		/* reserved names cannot be a filename */
-		if (stringIsEqual(".", (char *)buf, length) || stringIsEqual("..", (char *)buf, length))
-			return -1;
-
-		/* check collision with other filenames */
-		LL_FOR_EACH(cur_f, &d->parent->files, struct file, obj.entry)
-		{
-			if (stringIsEqual(cur_f->name, (char *)buf, length))
-				return -1;
-		}
-
-		/* check collision with directory names */
-		LL_FOR_EACH(cur_d, &d->parent->directories, struct directory, obj.entry)
-		{
-			if (cur_d != d && stringIsEqual(cur_d->name, (char *)buf, length))
-				return -1;
-		}
-	}
+	if (length && !__isValidFilename(&d->obj, d->parent, (char *)buf, length))
+		return -1;
 
 	/* deallocate the old name */
 	if (d->name)
@@ -290,11 +330,10 @@ static int32_t __directoryRead(struct object *obj, uint8_t *buf, uint32_t length
  *
  * @return Pointer to the kernel file object
  */
-struct file *fileCreate(struct directory *parent, char *name, uint32_t nameLength, uint8_t *heapBuffer, uint32_t heapSize)
+struct file *fileCreate(struct directory *parent, char *name, uint32_t nameLength, uint8_t *staticBuffer, uint32_t staticSize)
 {
 	struct file *f;
 	char *buffer = NULL;
-	assert(parent);
 
 	/* allocate some new memory */
 	if (!(f = heapAlloc(sizeof(*f))))
@@ -316,28 +355,27 @@ struct file *fileCreate(struct directory *parent, char *name, uint32_t nameLengt
 	__objectInit(&f->obj, &fileFunctions);
 	f->parent	= parent;
 	f->name		= buffer;
-	f->deleted	= false;
 	ll_init(&f->openedFiles);
 
-	if (heapBuffer)
+	if (staticBuffer)
 	{
-		f->isHeap	= true;
-		f->buffer	= heapBuffer;
-		f->size		= heapSize;
+		f->isHeap	= false;
+		f->buffer	= staticBuffer;
+		f->size		= staticSize;
 	}
 	else
 	{
-		f->isHeap	= false;
+		f->isHeap	= true;
 		f->buffer	= NULL;
 		f->size		= 0;
 	}
 
 	/* add this element to the directory */
-	ll_add_tail(&parent->files, &f->obj.entry);
-	objectAddRef(parent);
-
-	/* make it persistent */
-	objectAddRef(f);
+	if (parent)
+	{
+		ll_add_tail(&parent->files, &f->obj.entry);
+		objectAddRef(f);
+	}
 
 	return f;
 }
@@ -350,25 +388,20 @@ struct file *fileCreate(struct directory *parent, char *name, uint32_t nameLengt
 static void __fileDestroy(struct object *obj)
 {
 	struct file *f = objectContainer(obj, struct file, &fileFunctions);
-	struct directory *parent = f->parent;
-	assert(parent);
 
-	/* unlink from the parent directory */
-	ll_remove(&f->obj.entry);
+	/* at this point there shouldn't be any parent directory anymore */
+	assert(!f->parent);
 
 	/* free the memory containing the name */
 	if (f->name) heapFree(f->name);
 
 	/* release heap memory */
-	if (!f->isHeap && f->buffer)
+	if (f->isHeap && f->buffer)
 		heapFree(f->buffer);
 
 	/* release file memory */
 	f->obj.functions = NULL;
 	heapFree(f);
-
-	/* decrement the refcount of the parent object */
-	objectRelease(parent);
 }
 
 /**
@@ -381,11 +414,14 @@ static void __fileShutdown(struct object *obj, UNUSED uint32_t mode)
 {
 	struct file *f = objectContainer(obj, struct file, &fileFunctions);
 
-	if (!f->deleted)
+	if (f->parent)
 	{
-		f->deleted = true;
-		objectRelease(f);
+		/* unlink from the parent directory */
+		ll_remove(&f->obj.entry);
+		f->parent = NULL;
 
+		/* release object */
+		objectRelease(f);
 	}
 }
 
@@ -411,36 +447,15 @@ static int32_t __fileGetStatus(struct object *obj, UNUSED uint32_t mode)
  * @param length Length of the new name
  * @return Number of bytes written (without null characters) or (-1) on error
  */
-static int32_t __fileWrite(struct object *obj, UNUSED uint8_t *buf, UNUSED uint32_t length)
+static int32_t __fileWrite(struct object *obj, uint8_t *buf, uint32_t length)
 {
 	struct file *f = objectContainer(obj, struct file, &fileFunctions);
 
 	/* get rid of nullterminating character at the end of the filename */
 	while (length > 0 && !buf[length - 1]) length--;
 
-	if (length && f->parent)
-	{
-		struct file *cur_f;
-		struct directory *cur_d;
-
-		/* reserved names cannot be a filename */
-		if (stringIsEqual(".", (char *)buf, length) || stringIsEqual("..", (char *)buf, length))
-			return -1;
-
-		/* check collision with other filenames */
-		LL_FOR_EACH(cur_f, &f->parent->files, struct file, obj.entry)
-		{
-			if (cur_f != f && stringIsEqual(cur_f->name, (char *)buf, length))
-				return -1;
-		}
-
-		/* check collision with directory names */
-		LL_FOR_EACH(cur_d, &f->parent->directories, struct directory, obj.entry)
-		{
-			if (stringIsEqual(cur_d->name, (char *)buf, length))
-				return -1;
-		}
-	}
+	if (length && !__isValidFilename(&f->obj, f->parent, (char *)buf, length))
+		return -1;
 
 	/* deallocate the old name */
 	if (f->name)
@@ -511,7 +526,6 @@ struct openedFile *fileOpen(struct file *file)
 
 	/* add this element to the file */
 	ll_add_tail(&file->openedFiles, &h->obj.entry);
-
 	objectAddRef(file);
 
 	return h;
@@ -537,6 +551,32 @@ static void __openedFileDestroy(struct object *obj)
 
 	/* decrement the refcount of the parent object */
 	objectRelease(file);
+}
+
+/**
+ * @brief Truncates a file at the given position
+ *
+ * @param obj Pointer to the kernel openedFile object
+ * @param mode not used
+ */
+static void __openedFileShutdown(struct object *obj, UNUSED uint32_t mode)
+{
+	struct openedFile *h = objectContainer(obj, struct openedFile, &openedFileFunctions);
+	struct file *f = h->file;
+
+	/* only truncating supported so far */
+	if (h->pos < f->size)
+	{
+		/* realloc buffer */
+		if (f->isHeap && f->buffer)
+		{
+			uint8_t *new_buffer = heapReAlloc(f->buffer, h->pos);
+			if (new_buffer) f->buffer = new_buffer;
+		}
+
+		/* define new size */
+		f->size = h->pos;
+	}
 }
 
 /**
@@ -585,7 +625,7 @@ static int32_t __openedFileWrite(struct object *obj, uint8_t *buf, uint32_t leng
 	{
 		uint8_t *new_buffer;
 
-		if (f->isHeap || !f->buffer)
+		if (!f->isHeap || !f->buffer)
 			new_buffer = heapAlloc(h->pos + length);
 		else
 			new_buffer = heapReAlloc(f->buffer, h->pos + length);
@@ -593,17 +633,18 @@ static int32_t __openedFileWrite(struct object *obj, uint8_t *buf, uint32_t leng
 		if (new_buffer)
 		{
 			/* copy buffer */
-			if (!f->isHeap)
+			if (!f->isHeap && f->buffer)
 				memcpy(new_buffer, f->buffer, f->size);
 
 			/* clear unused buffer space */
 			if (h->pos > f->size)
 				memset(new_buffer + f->size, 0, h->pos - f->size);
 
+			f->isHeap	= true;
 			f->buffer	= new_buffer;
 			f->size		= h->pos + length;
 		}
-		else if (h->pos < f->size)
+		else if (f->isHeap && h->pos < f->size)
 		{
 			assert(f->size - h->pos < length);
 			length = f->size - h->pos;
@@ -613,6 +654,8 @@ static int32_t __openedFileWrite(struct object *obj, uint8_t *buf, uint32_t leng
 
 	/* copy bytes to the buffer */
 	memcpy(f->buffer + h->pos, buf, length);
+	h->pos += length;
+
 	return length;
 }
 
@@ -629,6 +672,7 @@ static int32_t __openedFileRead(struct object *obj, uint8_t *buf, uint32_t lengt
 {
 	struct openedFile *h = objectContainer(obj, struct openedFile, &openedFileFunctions);
 	struct file *f = h->file;
+	if (h->pos >= f->size) return -1;
 
 	/* don't read beyond the end of the file */
 	if (length > f->size - h->pos)
@@ -645,16 +689,140 @@ static int32_t __openedFileRead(struct object *obj, uint8_t *buf, uint32_t lengt
 }
 
 /**
+ * @brief Creates a new kernel openedDirectory object
+ *
+ * @param directory Pointer to the directory
+ *
+ * @return Pointer to the kernel openedDirectory object
+ */
+struct openedDirectory *directoryOpen(struct directory *directory)
+{
+	struct openedDirectory *h;
+	assert(directory);
+
+	/* allocate some new memory */
+	if (!(h = heapAlloc(sizeof(*h))))
+		return NULL;
+
+	/* initialize general object info */
+	__objectInit(&h->obj, &openedDirectoryFunctions);
+	h->directory	= directory;
+	h->pos			= NULL;
+
+	/* add this element to the directory */
+	ll_add_tail(&directory->openedDirectories, &h->obj.entry);
+	objectAddRef(directory);
+
+	return h;
+}
+
+/**
+ * @brief Destructor for kernel openedDirectory objects
+ *
+ * @param obj Pointer to the kernel openedDirectory object
+ */
+static void __openedDirectoryDestroy(struct object *obj)
+{
+	struct openedDirectory *h = objectContainer(obj, struct openedDirectory, &openedDirectoryFunctions);
+	struct directory *directory = h->directory;
+	assert(directory);
+
+	/* unlink from the directory */
+	ll_remove(&h->obj.entry);
+
+	/* release current object pointer */
+	if (h->pos)
+		__objectRelease(h->pos);
+
+	/* release directory memory */
+	h->obj.functions = NULL;
+	heapFree(h);
+
+	/* decrement the refcount of the parent object */
+	objectRelease(directory);
+}
+
+/**
+ * @brief Enumerate all directories and files in the current directory
+ *
+ * @param obj Pointer to the kernel openedDirectory object
+ * @param buf Pointer to the buffer
+ * @param length Number of bytes to read from the file
+ * @return Number of bytes read
+ */
+static int32_t __openedDirectoryRead(struct object *obj, uint8_t *buf, uint32_t length)
+{
+	struct openedDirectory *h = objectContainer(obj, struct openedDirectory, &openedDirectoryFunctions);
+	struct directory *directory = h->directory;
+
+	struct file *f;
+	struct directory *d;
+
+	const char *name;
+	uint32_t name_length;
+
+	if (!h->pos || h->pos->functions == &fileFunctions)
+	{
+		if (!h->pos)
+			f = LL_ENTRY(directory->files.next, struct file, obj.entry);
+		else
+		{
+			f = objectContainer(h->pos, struct file, &fileFunctions);
+			f = LL_ENTRY(f->obj.entry.next, struct file, obj.entry);
+		}
+
+		while (&f->obj.entry != &directory->files && !f->name)
+			f = LL_ENTRY(f->obj.entry.next, struct file, obj.entry);
+
+		if (&f->obj.entry == &directory->files)
+		{
+			d = LL_ENTRY(directory->directories.next, struct directory, obj.entry);
+			goto enumdir;
+		}
+
+		h->pos = &f->obj;
+		name = f->name;
+	}
+	else if (h->pos->functions == &directoryFunctions)
+	{
+		d = objectContainer(h->pos, struct directory, &directoryFunctions);
+		d = LL_ENTRY(d->obj.entry.next, struct directory, obj.entry);
+enumdir:
+		while (&d->obj.entry != &directory->directories && !d->name)
+			d = LL_ENTRY(d->obj.entry.next, struct directory, obj.entry);
+
+		if (&d->obj.entry == &directory->directories)
+		{
+			h->pos = NULL;
+			return -1;
+		}
+
+		h->pos = &d->obj;
+		name = d->name;
+	}
+	else assert(0); /* should never happen */
+
+	/* output name */
+	name_length = stringLength(name) + 1;
+
+	/* limit the number of characters to the string length + 1 */
+	if (length > name_length)
+		length = name_length;
+
+	memcpy(buf, name, length);
+	return length;
+}
+
+
+/**
  * @brief Initializes the root file system
  */
 void fileSystemInit()
 {
 	assert(!fileSystemRoot);
+
 	fileSystemRoot = directoryCreate(NULL, NULL, 0);
 	assert(fileSystemRoot);
-
-	/* let only exactly one reference remain */
-	objectRelease(fileSystemRoot);
 }
 
 /**
@@ -668,8 +836,19 @@ void fileSystemInit()
  */
 struct directory *fileSystemIsValidDirectory(struct object *obj)
 {
-	if (!obj || obj->functions != &directoryFunctions) return NULL;
-	return objectContainer(obj, struct directory, &directoryFunctions);
+	if (!obj) return NULL;
+
+	if (obj->functions == &openedDirectoryFunctions)
+	{
+		struct openedDirectory *h = objectContainer(obj, struct openedDirectory, &openedDirectoryFunctions);
+		if (!h->pos || h->pos->functions != &directoryFunctions) return NULL;
+		return objectContainer(h->pos, struct directory, &directoryFunctions);
+	}
+
+	if (obj->functions == &directoryFunctions)
+		return objectContainer(obj, struct directory, &directoryFunctions);
+
+	return NULL;
 }
 
 /**
@@ -683,8 +862,19 @@ struct directory *fileSystemIsValidDirectory(struct object *obj)
  */
 struct file *fileSystemIsValidFile(struct object *obj)
 {
-	if (!obj || obj->functions != &fileFunctions) return NULL;
-	return objectContainer(obj, struct file, &fileFunctions);
+	if (!obj) return NULL;
+
+	if (obj->functions == &openedDirectoryFunctions)
+	{
+		struct openedDirectory *h = objectContainer(obj, struct openedDirectory, &openedDirectoryFunctions);
+		if (!h->pos || h->pos->functions != &fileFunctions) return NULL;
+		return objectContainer(h->pos, struct file, &fileFunctions);
+	}
+
+	if (obj->functions == &fileFunctions)
+		return objectContainer(obj, struct file, &fileFunctions);
+
+	return NULL;
 }
 
 /**
@@ -703,6 +893,94 @@ struct directory *fileSystemGetRoot()
 }
 
 /**
+ * @brief Opens or creates a directory
+ * @details This function will search for a given directory in the file system root.
+ *			If create is true, then the directory object is created if it doesn't exist yet
+ *
+ * @param directory Directory in which to search for the specific directory or NULL
+ * @param path Path to the directory
+ * @param pathLength Length of the directory
+ * @param create If true the directory (including parent directories) will be created if it doesn't exist yet
+ *
+ * @return Pointer to the directory object
+ */
+struct directory *fileSystemSearchDirectory(struct directory *directory, char *path, uint32_t pathLength, bool create)
+{
+	struct file *f;
+	struct directory *d;
+	uint32_t componentLength;
+
+	if (!directory)
+		directory = fileSystemRoot;
+
+subdir:
+	assert(directory);
+
+	/* skip over leading slashes */
+	while (pathLength > 0 && path[0] == '/')
+	{
+		pathLength--;
+		path++;
+	}
+
+	/* search for the path delimiter */
+	componentLength = 0;
+	while (componentLength < pathLength && path[componentLength] != '/') componentLength++;
+
+	/* if the path is empty then return the current directory */
+	if (!componentLength)
+	{
+		objectAddRef(directory);
+		return directory;
+	}
+
+	/* handle special cases */
+	if (stringIsEqual(".", path, componentLength) || stringIsEqual("..", path, componentLength))
+	{
+		path		+= componentLength;
+		pathLength	-= componentLength;
+
+		/* go to the parent directory (if any) */
+		if (stringIsEqual("..", path, componentLength) && directory->parent)
+			directory = directory->parent;
+
+		goto subdir;
+	}
+
+	/* search for subdirectory */
+	LL_FOR_EACH(d, &directory->directories, struct directory, obj.entry)
+	{
+		if (stringIsEqual(d->name, path, componentLength))
+		{
+			path		+= componentLength;
+			pathLength	-= componentLength;
+			directory	= d;
+			goto subdir;
+		}
+	}
+
+	/* if we don't want to create it we can return immediately */
+	if (!create) return NULL;
+
+	/* ensure name is not used by a file */
+	LL_FOR_EACH(f, &directory->files, struct file, obj.entry)
+	{
+		if (stringIsEqual(f->name, path, componentLength))
+			return NULL;
+	}
+
+	/* create a new directory (empty) */
+	d = directoryCreate(directory, path, componentLength);
+	if (!d) return NULL;
+
+	path		+= componentLength;
+	pathLength	-= componentLength;
+	directory	= d;
+	goto subdir;
+}
+
+
+/**
  * @brief Opens or creates a file
  * @details This function will search for a given file in the file system root.
  *			If create is specified the new file object is created if it doesn't exist yet
@@ -716,110 +994,58 @@ struct directory *fileSystemGetRoot()
  */
 struct file *fileSystemSearchFile(struct directory *directory, char *path, uint32_t pathLength, bool create)
 {
-	uint32_t componentLength;
 	struct file *f;
 	struct directory *d;
+	uint32_t componentLength;
 
-subdir:
-	/* skip over leading slashes */
-	while (pathLength > 0 && path[0] == '/')
-	{
-		pathLength--;
-		path++;
-	}
+	componentLength = pathLength;
+	while (componentLength > 0 && path[componentLength-1] != '/') componentLength--;
 
-	if (!directory)
-		directory = fileSystemRoot;
-	assert(directory);
-
-	/* search for the path delimiter */
-	componentLength = 0;
-	while (componentLength < pathLength && path[componentLength] != '/') componentLength++;
-
-	if (!componentLength) return NULL;
-
-	/* no more delimiters found, open the file */
+	/* no filename specified */
 	if (componentLength >= pathLength)
-	{
-
-		/* reserved names cannot be a filename */
-		if (stringIsEqual(".", path, pathLength) || stringIsEqual("..", path, pathLength))
-			return NULL;
-
-		/* search for the file */
-		LL_FOR_EACH(f, &directory->files, struct file, obj.entry)
-		{
-			if (stringIsEqual(f->name, path, pathLength))
-			{
-				objectAddRef(f);
-				return f;
-			}
-		}
-
-		/* if we don't want to create it we can return immediately */
-		if (!create) return NULL;
-
-		/* ensure the name is not used by a directory */
-		LL_FOR_EACH(d, &directory->directories, struct directory, obj.entry)
-		{
-			if (stringIsEqual(d->name, path, pathLength))
-				return NULL;
-		}
-
-		/* create a new file and return the reference */
-		return fileCreate(directory, path, pathLength, NULL, 0);
-	}
-	else
-	{
-		if (stringIsEqual(".", path, pathLength))
-		{
-			path		+= componentLength;
-			pathLength	-= componentLength;
-			goto subdir;
-		}
-		else if (stringIsEqual("..", path, pathLength))
-		{
-			if (!directory->parent)
-			{
-				path		+= componentLength;
-				pathLength	-= componentLength;
-				goto subdir;
-			}
-			return fileSystemSearchFile(directory->parent, path + componentLength, pathLength - componentLength, create);
-		}
-
-		LL_FOR_EACH(d, &directory->directories, struct directory, obj.entry)
-		{
-			if (stringIsEqual(d->name, path, componentLength))
-				return fileSystemSearchFile(d, path + componentLength, pathLength - componentLength, create);
-		}
-
-		/* if we don't want to create it we can return immediately */
-		if (!create) return NULL;
-
-		/* ensure name is not used by a file */
-		LL_FOR_EACH(f, &directory->files, struct file, obj.entry)
-		{
-			if (stringIsEqual(f->name, path, componentLength))
-				return NULL;
-		}
-
-		d = directoryCreate(directory, path, componentLength);
-		if (d)
-		{
-			f = fileSystemSearchFile(d, path + componentLength, pathLength - componentLength, create);
-			if (f)
-			{
-				objectRelease(d);
-				return f;
-			}
-
-			objectShutdown(f, 0);
-			objectRelease(d);
-		}
-
 		return NULL;
+
+	d = fileSystemSearchDirectory(directory, path, componentLength, create);
+	if (!d) return NULL;
+
+	path		+= componentLength;
+	pathLength	-= componentLength;
+	directory	= d;
+
+	/* reserved names cannot be a filename */
+	if (stringIsEqual(".", path, pathLength) || stringIsEqual("..", path, pathLength))
+		goto err;
+
+	/* search for the file */
+	LL_FOR_EACH(f, &directory->files, struct file, obj.entry)
+	{
+		if (stringIsEqual(f->name, path, pathLength))
+		{
+			objectAddRef(f);
+			objectRelease(directory);
+			return f;
+		}
 	}
+
+
+	/* if we don't want to create it we can return immediately */
+	if (!create) goto err;
+
+	/* ensure the name is not used by a directory */
+	LL_FOR_EACH(d, &directory->directories, struct directory, obj.entry)
+	{
+		if (stringIsEqual(d->name, path, pathLength))
+			goto err;
+	}
+
+	/* create a new file and return the reference */
+	f = fileCreate(directory, path, pathLength, NULL, 0);
+	objectRelease(directory);
+	return f;
+
+err:
+	objectRelease(directory);
+	return NULL;
 }
 
 /**

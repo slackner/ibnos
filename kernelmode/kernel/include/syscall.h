@@ -457,22 +457,35 @@ enum
 	/**
 	 * Searches for a given file, and returns a pointer to the file object
 	 * - \b Parameters:
+	 *				- Parent directory handle or (-1)
 	 *				- Filename buffer
 	 *				- Filename length
 	 *				- Create nonexistent file
 	 *	- \b Returns:
 	 *				- Handle to the file object
 	 */
-	SYSCALL_FILE_SEARCH								= 0x600,
+	SYSCALL_FILESYSTEM_SEARCH_FILE					= 0x600,
 
 	/**
-	 * Opens a file by using a file object.
+	 * Searches for a given directory, and returns a pointer to the directory object
 	 * - \b Parameters:
-	 *				- Handle to a file object
-	 * - \b Returns:
-	 *				- Handle to a opened file object
+	 *				- Parent directory handle or (-1)
+	 *				- Directory buffer
+	 *				- Directory length
+	 *				- Create nonexistent directory
+	 *	- \b Returns:
+	 *				- Handle to the directory object
 	 */
-	SYSCALL_FILE_OPEN,
+	SYSCALL_FILESYSTEM_SEARCH_DIRECTORY,
+
+	/**
+	 * Opens a directory or file.
+	 * - \b Parameters:
+	 *				- Handle to a directory/file object
+	 * - \b Returns:
+	 *				- Handle to a opened directory/file object
+	 */
+	SYSCALL_FILESYSTEM_OPEN,
 
 };
 
@@ -527,7 +540,6 @@ enum
 	{
 		ibnos_syscall(SYSCALL_YIELD);
 	}
-
 	/* exit is already provided by the libc */
 
 	static inline void exitThread(int exitcode)
@@ -711,14 +723,19 @@ enum
 		return ibnos_syscall(SYSCALL_CONSOLE_GET_FLAGS);
 	}
 
-	static inline int32_t fileSearch(const char *path, uint32_t length, bool create)
+	static inline int32_t filesystemSearchFile(int32_t handle, const char *path, uint32_t length, bool create)
 	{
-		return ibnos_syscall(SYSCALL_FILE_SEARCH, (uint32_t)path, length, create);
+		return ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_FILE, (uint32_t)handle, (uint32_t)path, length, create);
 	}
 
-	static inline int32_t fileOpen(int32_t handle)
+	static inline int32_t filesystemSearchDirectory(int32_t handle, const char *path, uint32_t length, bool create)
 	{
-		return ibnos_syscall(SYSCALL_FILE_OPEN, (uint32_t)handle);
+		return ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_DIRECTORY, (uint32_t)handle, (uint32_t)path, length, create);
+	}
+
+	static inline int32_t filesystemOpen(int32_t handle)
+	{
+		return ibnos_syscall(SYSCALL_FILESYSTEM_OPEN, (uint32_t)handle);
 	}
 
 #endif
