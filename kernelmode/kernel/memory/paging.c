@@ -366,6 +366,7 @@ uint32_t interrupt_0x0E(UNUSED uint32_t interrupt, uint32_t error, struct thread
 
 			pagingReleasePhysMem(NULL, destination, 1);
 			pagingReleasePhysMem(NULL, source, 1);
+			physMemReleasePage(old_index);
 		}
 	}
 
@@ -1203,6 +1204,7 @@ void *pagingMapRemoteMemory(struct process *dst_p, struct process *src_p, void *
 
 				pagingReleasePhysMem(NULL, destination, 1);
 				pagingReleasePhysMem(NULL, source, 1);
+				physMemReleasePage(old_index);
 			}
 		}
 
@@ -1573,6 +1575,7 @@ void *pagingTryMapUserMem(struct process *src_p, void *src_addr, uint32_t length
 
 				pagingReleasePhysMem(NULL, destination, 1);
 				pagingReleasePhysMem(NULL, source, 1);
+				physMemReleasePage(old_index);
 			}
 		}
 
