@@ -1296,7 +1296,6 @@ void pagingForkProcessPageTable(struct process *destination, struct process *sou
 
 					case PAGING_AVAIL_NOTPRESENT_OUTPAGED:
 						physMemPageIn(src->frame);
-						assert(src->present);
 						break;
 
 					default:
