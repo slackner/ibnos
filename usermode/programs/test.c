@@ -445,10 +445,12 @@ DECLARE_TEST_FUNC(event)
 
 DECLARE_TEST_FUNC(filesystem)
 {
-	static const char path1[] = "/etc/passwd";
+	static const char path0[] = "/test";
+
+	static const char path1[] = "/test/etc/passwd";
 	static const char str1[] = "Some data for the passwd file";
 
-	static const char path2[] = "/home/user/testfile";
+	static const char path2[] = "/test/home/user/testfile";
 	static const char str2[] = "Testdata";
 
 	int32_t file, dir, handle, handle2, handle3, handle4;
@@ -479,7 +481,7 @@ DECLARE_TEST_FUNC(filesystem)
 	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, file));
 
 	/* Enumerate directory content (recursive) */
-	dir = ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_DIRECTORY, -1, 0, 0, 0);
+	dir = ibnos_syscall(SYSCALL_FILESYSTEM_SEARCH_DIRECTORY, -1, (uint32_t)path0, sizeof(path0), 0);
 	ok(dir >= 0);
 
 	handle = ibnos_syscall(SYSCALL_FILESYSTEM_OPEN, dir);
@@ -589,6 +591,58 @@ DECLARE_TEST_FUNC(filesystem)
 	ok(ibnos_syscall(SYSCALL_OBJECT_CLOSE, file));
 }
 
+DECLARE_TEST_FUNC(file)
+{
+	FILE *f;
+	int res;
+	char *buf = NULL;
+	size_t buflen = 0;
+	char tmpbuf[64];
+
+	f = fopen("/test.txt", "r");
+	ok(f == NULL);
+
+	f = fopen("/test.txt", "wb");
+	ok(f != NULL);
+
+	ok(fwrite("First", 1, 5, f) == 5);
+	ok(fwrite(" line\n", 1, 6, f) == 6);
+	ok(fwrite("Second line\n", 1, 12, f) == 12);
+	ok(fwrite("Third line", 1, 10, f) == 10);
+
+	fclose(f);
+
+	f = fopen("/test.txt", "rb");
+	ok(f != NULL);
+
+	ok(fread(tmpbuf, 1, 5, f) == 5);
+	tmpbuf[5] == 0;
+	ok(!strcmp(tmpbuf, "First"));
+
+	ok(fseek(f, 0, SEEK_SET) == 0);
+
+	res = __getline(&buf, &buflen, f);
+	ok(res != -1);
+	buf[res] = 0;
+	ok(!strcmp(buf, "First line\n"));
+
+	res = __getline(&buf, &buflen, f);
+	ok(res != -1);
+	buf[res] = 0;
+	ok(!strcmp(buf, "Second line\n"));
+
+	res = __getline(&buf, &buflen, f);
+	ok(res != -1);
+	buf[res] = 0;
+	ok(!strcmp(buf, "Third line"));
+
+	fclose(f);
+
+	if (buf) free(buf);
+
+	ok(unlink("/test.txt") == 0);
+}
+
 int cmdTest(UNUSED char **argv, UNUSED int argc)
 {
 	__failureSemaphore = ibnos_syscall(SYSCALL_CREATE_SEMAPHORE, 0);
@@ -600,6 +654,7 @@ int cmdTest(UNUSED char **argv, UNUSED int argc)
 	test_timer();
 	test_event();
 	test_filesystem();
+	test_file();
 
 	printf("All tests finished.\n");
 	exit(0);

@@ -8,14 +8,14 @@
 
 _ssize_t _write_r(struct _reent *eptr, int file, const void *ptr, size_t len)
 {
-	int32_t ret 	= 0;
+	int32_t ret;
 	size_t written 	= 0;
 	eptr->_errno 	= 0;
 
 	while (len > 0)
 	{
 		/* write some data (if possible) */
-		ret = ibnos_syscall(SYSCALL_OBJECT_WRITE, (uint32_t)file, (uint32_t)ptr, (uint32_t)len);
+		ret = objectWrite(file, ptr, len);
 		if (ret < 0)
 			break;
 
@@ -24,12 +24,11 @@ _ssize_t _write_r(struct _reent *eptr, int file, const void *ptr, size_t len)
 
 		/* we couldn't write any data, let's wait till there is some space in the kernel buffer */
 		if (len && ret == 0)
-			ibnos_syscall(SYSCALL_OBJECT_WAIT, (uint32_t)file, 1);
+			objectWait(file, 1);
 	}
 
 	if (ret < 0)
 	{
-		/* there was some error with the pipe */
 		eptr->_errno = EPIPE;
 		return -1;
 	}

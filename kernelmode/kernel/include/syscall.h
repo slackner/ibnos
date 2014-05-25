@@ -209,7 +209,7 @@ enum
 	 * - \b Returns:
 	 *				- new kernel handle
 	 */
-	 SYSCALL_OBJECT_DUP,
+	 SYSCALL_OBJECT_DUP							= 0x400,
 
 	/**
 	 * Replaces a kernel handle with a new object
@@ -228,7 +228,7 @@ enum
 	 * - \b Returns:
 	 *				- True if it exists, otherwise false
 	 */
-	SYSCALL_OBJECT_EXISTS						= 0x400,
+	SYSCALL_OBJECT_EXISTS,
 
 	/**
 	 * Checks if two handles point to the same kernel object.

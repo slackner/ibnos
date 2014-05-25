@@ -3,9 +3,27 @@
 #include <_syslist.h>
 #include <reent.h>
 #include <errno.h>
+#include "syscall.h"
 
 int _unlink_r(struct _reent *ptr, const char *name)
 {
-  ptr->_errno = ENOSYS;
-  return -1;
+	int32_t fileobj, ret;
+
+	fileobj = filesystemSearchFile(-1, name, strlen(name), 0);
+	if (fileobj < 0)
+	{
+		ptr->_errno = ENOENT;
+		return -1;
+	}
+
+	ret = objectShutdown(fileobj, 0);
+	objectClose(fileobj);
+
+	if (ret < 0)
+	{
+		ptr->_errno = EACCES;
+		return -1;
+	}
+
+	return 0;
 }
