@@ -11,16 +11,16 @@ char **__get_ibnos_argv()
 {
 	static bool init = false;
 	uint8_t *buf_argv = getProgramArguments();
+	uint32_t buflen_argv = getProgramArgumentsLength();
 
-	if (!init && buf_argv)
+	if (!init && buf_argv && buflen_argv >= sizeof(uint32_t))
 	{
 		uint32_t *offset = (uint32_t *)buf_argv;
-		uint32_t buflen_argv = getProgramArgumentsLength(); 
 		buf_argv[buflen_argv - 1] = 0; /* add nullterminatation if necessary */
 
 		while (buflen_argv >= sizeof(uint32_t))
 		{
-			if (!*offset || *offset >= buflen_argv)
+			if (!*offset || *offset >= buflen_argv || buflen_argv < 2* sizeof(uint32_t))
 			{
 				*offset = 0;
 				break;
@@ -52,16 +52,16 @@ char **__get_ibnos_envp()
 {
 	static bool init = false;
 	uint8_t *buf_envp = getEnvironmentVariables();
+	uint32_t buflen_envp = getEnvironmentVariablesLength();
 
-	if (!init && buf_envp)
+	if (!init && buf_envp && buflen_envp >= sizeof(uint32_t))
 	{
 		uint32_t *offset = (uint32_t *)buf_envp;
-		uint32_t buflen_envp = getEnvironmentVariablesLength(); 
 		buf_envp[buflen_envp - 1] = 0; /* add nullterminatation if necessary */
 
 		while (buflen_envp >= sizeof(uint32_t))
 		{
-			if (!*offset || *offset >= buflen_envp)
+			if (!*offset || *offset >= buflen_envp || buflen_envp < 2* sizeof(uint32_t))
 			{
 				*offset = 0;
 				break;
