@@ -380,12 +380,20 @@ uint32_t interrupt_0x80(UNUSED uint32_t interrupt, UNUSED uint32_t error, struct
 			t->task.eax = t->user_threadLocalLength << PAGE_BITS;
 			break;
 
-		case SYSCALL_GET_PROGRAM_ARGUMENTS:
+		case SYSCALL_GET_PROGRAM_ARGUMENTS_BASE:
 			t->task.eax = (uint32_t)p->user_programArgumentsBase;
 			break;
 
-		case SYSCALL_GET_ENVIRONMENT_VARIABLES:
+		case SYSCALL_GET_PROGRAM_ARGUMENTS_LENGTH:
+			t->task.eax = p->user_programArgumentsLength << PAGE_BITS;
+			break;
+
+		case SYSCALL_GET_ENVIRONMENT_VARIABLES_BASE:
 			t->task.eax = (uint32_t)p->user_environmentVariablesBase;
+			break;
+
+		case SYSCALL_GET_ENVIRONMENT_VARIABLES_LENGTH:
+			t->task.eax = p->user_environmentVariablesLength << PAGE_BITS;
 			break;
 
 		case SYSCALL_ALLOCATE_MEMORY:

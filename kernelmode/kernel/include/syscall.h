@@ -140,7 +140,8 @@ enum
 	 * - \b Returns:
 	 * 				- Pointer to the argument array (if any)
 	 */
-	SYSCALL_GET_PROGRAM_ARGUMENTS,
+	SYSCALL_GET_PROGRAM_ARGUMENTS_BASE,
+	SYSCALL_GET_PROGRAM_ARGUMENTS_LENGTH,
 
 	/**
 	 * Get the program environment variables.
@@ -150,7 +151,8 @@ enum
 	 * - \b Returns:
 	 * 				- Pointer to the environment variable array (if any)
 	 */
-	SYSCALL_GET_ENVIRONMENT_VARIABLES,
+	SYSCALL_GET_ENVIRONMENT_VARIABLES_BASE,
+	SYSCALL_GET_ENVIRONMENT_VARIABLES_LENGTH,
 
 	/**
 	 * Allocate virtual pages.
@@ -615,12 +617,22 @@ enum
 
 	static inline void *getProgramArguments()
 	{
-		return (void *)ibnos_syscall(SYSCALL_GET_PROGRAM_ARGUMENTS);
+		return (void *)ibnos_syscall(SYSCALL_GET_PROGRAM_ARGUMENTS_BASE);
+	}
+
+	static inline uint32_t getProgramArgumentsLength()
+	{
+		return ibnos_syscall(SYSCALL_GET_PROGRAM_ARGUMENTS_LENGTH);
 	}
 
 	static inline void *getEnvironmentVariables()
 	{
-		return (void *)ibnos_syscall(SYSCALL_GET_ENVIRONMENT_VARIABLES);
+		return (void *)ibnos_syscall(SYSCALL_GET_ENVIRONMENT_VARIABLES_BASE);
+	}
+
+	static inline uint32_t getEnvironmentVariablesLength()
+	{
+		return ibnos_syscall(SYSCALL_GET_ENVIRONMENT_VARIABLES_LENGTH);
 	}
 
 	/* malloc, free and fork are also provided by the libc */
