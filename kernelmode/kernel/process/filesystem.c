@@ -325,8 +325,8 @@ static int32_t __directoryRead(struct object *obj, uint8_t *buf, uint32_t length
  * @param parent Pointer to the parent directory
  * @param name Name of the file or NULL if the file doesn't have a name
  * @param nameLength Length of the name
- * @param heapBuffer Optional pointer to some heap memory
- * @param heapSize Size of the heap memory buffer
+ * @param staticBuffer Optional pointer to some heap memory
+ * @param staticSize Size of the heap memory buffer
  *
  * @return Pointer to the kernel file object
  */
