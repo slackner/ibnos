@@ -1,6 +1,9 @@
 *.o
 *.d
+*.exe
 /ibnos.iso
+/iso/boot/rootfs.tar
+/usermode/rootfs.tar
 /kernelmode/ibnos.kernel
 /usermode/init.user
 /iso/boot/ibnos.kernel

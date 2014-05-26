@@ -280,6 +280,7 @@ static char *shellInput()
 	buffer[pos] = 0;
 	return buffer;
 }
+char **environ;
 
 static void shellRunCommand(char **argv)
 {
@@ -312,7 +313,7 @@ static void shellRunCommand(char **argv)
 			if (in_pipe != 0)  dup2(in_pipe, 0);
 			if (out_pipe != 1) dup2(out_pipe, 1);
 
-			execve(argv[0], argv, NULL);
+			execvp(argv[0], argv);
 			exit(127);
 		}
 
@@ -356,6 +357,7 @@ static void shellRunCommand(char **argv)
 
 void shell()
 {
+	setenv("PATH", "/bin:/usr/bin", true);
 	printf("%s\n", welcomeMSG);
 
 	for (;;)

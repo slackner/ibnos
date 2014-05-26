@@ -437,6 +437,7 @@ case "${host}" in
 	;;
   i[34567]86-*-ibnos*)
 	sys_dir=ibnos
+	posix_dir=posix
 	newlib_cflags="${newlib_cflags} -DMALLOC_PROVIDED -DREENTRANT_SYSCALLS_PROVIDED -D__DYNAMIC_REENT__"
 	;;
   i[34567]86-*-rdos*)

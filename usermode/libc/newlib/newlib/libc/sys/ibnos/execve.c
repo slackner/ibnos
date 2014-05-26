@@ -73,3 +73,8 @@ int _execve_r(struct _reent *ptr, const char *name, char *const *argv, char *con
 	ptr->_errno = (ret >= 0) ? 0 : EACCES;
 	return ret;
 }
+
+int _execve(const char *name, char *const *argv, char *const *envp)
+{
+	return _execve_r(__getreent(), name, argv, envp);
+}
