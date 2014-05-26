@@ -74,6 +74,45 @@ bool stringIsEqual(const char *str, const char *buf, uint32_t len)
 }
 
 /**
+ * @brief Converts an octal string to a integer number
+ * 
+ * @param str Pointer to a string
+ * @param len Length of the buffer
+ * 
+ * @return Parsed integer number
+ */
+uint32_t stringParseOctal(const char *str, uint32_t len)
+{
+	uint32_t value = 0;
+
+	/* skip over leading whitespace */
+	while (len && *str == ' ')
+	{
+		str++;
+		len--;
+	}
+
+	while (len && (*str >= '0' && *str < '8'))
+	{
+		value = (value << 3) | (*str - '0');
+		str++;
+		len--;
+	}
+
+	/* skip over trailing whitespace */
+	while (len && *str == ' ')
+	{
+		str++;
+		len--;
+	}
+
+	/* not a nulltermination */
+	if (len && *str) return -1;
+
+	return value;
+}
+
+/**
  * @brief Fills a memory region with some specific byte value
  *
  * @param ptr Pointer to the start of the memory region

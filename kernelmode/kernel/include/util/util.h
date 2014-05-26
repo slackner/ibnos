@@ -40,6 +40,7 @@
 
 	uint32_t stringLength(const char *str);
 	bool stringIsEqual(const char *str, const char *buf, uint32_t len);
+	uint32_t stringParseOctal(const char *str, uint32_t len);
 
 	void *memset(void *ptr, int value, size_t num);
 	void *memcpy(void *destination, const void *source, size_t num);

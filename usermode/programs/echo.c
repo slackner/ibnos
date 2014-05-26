@@ -25,10 +25,9 @@
  *
  */
 
-#include "programs.h"
 #include <stdio.h>
 
-int cmdEcho(char **argv, int argc)
+int main(int argc, char **argv)
 {
 	int i;
 	for (i = 1; i < argc; i++)

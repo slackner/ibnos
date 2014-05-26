@@ -81,13 +81,42 @@
 		uint32_t pos;
 	};
 
+	struct tarHeader
+	{
+		char name[100];
+		char mode[8];
+		char uid[8];
+		char gid[8];
+		char size[12];
+		char mtime[12];
+		char checksum[8];
+		char typeflag;
+		char linkname[100];
+		char magic[6];
+		char version[2];
+		char uname[32];
+		char gname[32];
+		char devmajor[8];
+		char devminor[8];
+		char prefix[155];
+		char pad[12];
+	} __attribute__((packed));
+
+	#define TAR_TYPE_FILE		'0'
+	#define TAR_TYPE_HARDLINK	'1'
+	#define TAR_TYPE_SYMLINK	'2'
+	#define TAR_TYPE_DEVICE		'3'
+	#define TAR_TYPE_BLOCKDEV	'4'
+	#define TAR_TYPE_DIRECTORY	'5'
+	#define TAR_TYPE_NAMEDPIPE	'6'
+
 	struct directory *directoryCreate(struct directory *parent, char *name, uint32_t nameLength);
 	struct file *fileCreate(struct directory *parent, char *name, uint32_t nameLength, uint8_t *staticBuffer, uint32_t staticSize);
 
 	struct openedFile *fileOpen(struct file *file);
 	struct openedDirectory *directoryOpen(struct directory *directory);
 
-	void fileSystemInit();
+	void fileSystemInit(void *addr, uint32_t length);
 
 	struct directory *fileSystemIsValidDirectory(struct object *obj);
 	struct file *fileSystemIsValidFile(struct object *obj);

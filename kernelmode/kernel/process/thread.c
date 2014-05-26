@@ -36,9 +36,6 @@
 #include <util/list.h>
 #include <util/util.h>
 
-#define DEFAULT_STACK_SIZE	0x10000
-#define DEFAULT_TLB_SIZE	0x1000
-
 /** \addtogroup Threads
  *  @{
  *  Implementation of threads.

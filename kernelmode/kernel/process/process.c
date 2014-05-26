@@ -109,6 +109,11 @@ struct process *processCreate(struct process *original)
 		pagingForkProcessPageTable(p, original);
 	}
 
+	p->user_programArgumentsBase		= NULL;
+	p->user_programArgumentsLength		= 0;
+	p->user_environmentVariablesBase	= NULL;
+	p->user_environmentVariablesLength	= 0;
+
 	return p;
 }
 

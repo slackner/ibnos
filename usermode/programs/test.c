@@ -616,7 +616,7 @@ DECLARE_TEST_FUNC(file)
 	ok(f != NULL);
 
 	ok(fread(tmpbuf, 1, 5, f) == 5);
-	tmpbuf[5] == 0;
+	tmpbuf[5] = 0;
 	ok(!strcmp(tmpbuf, "First"));
 
 	ok(fseek(f, 0, SEEK_SET) == 0);
@@ -643,7 +643,7 @@ DECLARE_TEST_FUNC(file)
 	ok(unlink("/test.txt") == 0);
 }
 
-int cmdTest(UNUSED char **argv, UNUSED int argc)
+int main(UNUSED int argc, UNUSED char **argv)
 {
 	__failureSemaphore = ibnos_syscall(SYSCALL_CREATE_SEMAPHORE, 0);
 

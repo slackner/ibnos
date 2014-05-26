@@ -813,16 +813,114 @@ enumdir:
 	return length;
 }
 
+static inline bool __tarVerifyChecksum(struct tarHeader *tar)
+{
+	int8_t *buf = (int8_t *)tar;
+	uint32_t i, cksum = 0;
+
+	for (i = 0; i < 148; i++)
+		cksum += buf[i];
+
+	/* checksum filled with spaces */
+	for (i = 0; i < 8; i++)
+		cksum += ' ';
+
+	for (i = 156; i < 512; i++)
+		cksum += buf[i];
+
+	return (cksum == stringParseOctal(tar->checksum, sizeof(tar->checksum)));
+}
+
+static inline bool __tarIsEOF(struct tarHeader *tar, uint32_t length)
+{
+	uint8_t *buf = (uint8_t *)tar;
+
+	if (length < sizeof(struct tarHeader)*2)
+		return false;
+
+	length = sizeof(struct tarHeader)*2;
+
+	while (length)
+	{
+		if (*buf)
+			return false;
+		buf++;
+		length--;
+	}
+
+	return true;
+}
 
 /**
  * @brief Initializes the root file system
  */
-void fileSystemInit()
+void fileSystemInit(void *addr, uint32_t length)
 {
+	struct tarHeader *tar;
+
 	assert(!fileSystemRoot);
 
 	fileSystemRoot = directoryCreate(NULL, NULL, 0);
 	assert(fileSystemRoot);
+
+	/* tar header should fit exactly in one block */
+	assert(sizeof(struct tarHeader) == 512);
+
+	/* initialize default layout */
+	tar = (struct tarHeader *)addr;
+	while (length >= sizeof(struct tarHeader))
+	{
+		uint32_t size;
+		struct file *f;
+		char *name, namebuf[100+1+155+1];
+
+		/* detect eof */
+		if (__tarIsEOF(tar, length))
+			break;
+
+		/* ensure tar header is valid */
+		assert(__tarVerifyChecksum(tar));
+		size = stringParseOctal(tar->size, sizeof(tar->size));
+		assert(size != (uint32_t)-1);
+		assert(sizeof(struct tarHeader) + size <= length);
+		name = namebuf;
+
+		/* prepend with prefix */
+		if (stringIsEqual("ustar", tar->magic, sizeof(tar->magic)) && tar->prefix[0])
+		{
+			uint32_t prefixlen;
+			tar->prefix[sizeof(tar->prefix) - 1] = 0;
+			prefixlen = stringLength(tar->prefix);
+			memcpy(name, tar->prefix, prefixlen);
+			name += prefixlen;
+			*name++ = '/';
+		}
+
+		/* afterwards add the name and a null to terminate the string */
+		memcpy(name, tar->name, sizeof(tar->name));
+		name += sizeof(tar->name);
+		*name = 0;
+
+		if (!tar->typeflag || tar->typeflag == TAR_TYPE_FILE)
+		{
+
+			tar->name[sizeof(tar->name) - 1] = 0;
+			f = fileSystemSearchFile(0, namebuf, stringLength(namebuf), true);
+			assert(f);
+
+			f->isHeap	= false;
+			f->buffer	= (uint8_t *)(tar + 1);;
+			f->size		= size;
+			objectRelease(f);
+		}
+
+		/* round up to next 512 byte boundary */
+		size = sizeof(struct tarHeader) + ((size + 511) & ~511);
+		if (size > length)
+			break;
+		tar = (struct tarHeader *)((uint8_t *)tar + size);
+		length -= size;
+	}
 }
 
 /**
@@ -1026,7 +1124,6 @@ struct file *fileSystemSearchFile(struct directory *directory, char *path, uint3
 			return f;
 		}
 	}
-
 
 	/* if we don't want to create it we can return immediately */
 	if (!create) goto err;

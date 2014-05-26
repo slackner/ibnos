@@ -1,14 +1,14 @@
 include ../config.mk
 
 SOURCE		= $(wildcard *.c)
-OBJECTS		= $(SOURCE:.c=.o)
+EXECUTABLES	= $(SOURCE:.c=.exe)
 SUBDIRS		= $(dir $(wildcard */Makefile))
 
 .PHONY: all
-all: $(SUBDIRS) $(OBJECTS)
+all: $(SUBDIRS) $(EXECUTABLES)
 
-%.o: %.c
-	$(CC) $(CFLAGS) -MMD -MP -o $@ -c $<
+%.exe: %.c
+	$(CC) $(CFLAGS) -MMD -MP -o $@ $< $(LDFLAGS)
 
 -include $(SOURCE:.c=.d)
 
@@ -18,7 +18,7 @@ $(SUBDIRS):
 
 .PHONY: clean
 clean:
-	rm -f *.a *.o *.d
+	rm -f *.a *.o *.d *.exe
 	for dir in $(SUBDIRS); do \
 		$(MAKE) -C $$dir $@; \
 	done

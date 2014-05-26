@@ -104,6 +104,17 @@ enum
 	SYSCALL_GET_PROCESS_INFO,
 
 	/**
+	 * Replaces the current process with the one specified by the handle.
+	 * - \b Parameters:
+	 * 				- Pointer to a file object
+	 * 				- Argument buffer
+	 * 				- Length of argument buffer
+	 * - \b Returns:
+	 * 				- Nothing
+	 */
+	 SYSCALL_EXECUTE_PROGRAM,
+
+	/**
 	 * Get thread local storage address.
 	 * - \b Parameters:
 	 *				None
@@ -121,6 +132,25 @@ enum
 	 *				- Length in bytes
 	 */
 	SYSCALL_GET_THREADLOCAL_STORAGE_LENGTH,
+
+	/**
+	 * Get the program argument array.
+	 * - \b Parameters:
+	 * 				None
+	 * - \b Returns:
+	 * 				- Pointer to the argument array (if any)
+	 */
+	SYSCALL_GET_PROGRAM_ARGUMENTS,
+
+	/**
+	 * Get the program environment variables.
+	 * - \b Parameters:
+	 * 				None
+	 * 
+	 * - \b Returns:
+	 * 				- Pointer to the environment variable array (if any)
+	 */
+	SYSCALL_GET_ENVIRONMENT_VARIABLES,
 
 	/**
 	 * Allocate virtual pages.
@@ -568,14 +598,29 @@ enum
 		return ibnos_syscall(SYSCALL_GET_PROCESS_INFO, (uint32_t)info, count);
 	}
 
+	static inline int32_t executeProgram(int32_t handle, void *arg, uint32_t arglen, void *env, uint32_t envlen)
+	{
+		return ibnos_syscall(SYSCALL_EXECUTE_PROGRAM, (uint32_t)handle, (uint32_t)arg, arglen, (uint32_t)env, envlen);
+	}
+
 	static inline void *getTLS()
 	{
-		return (void*)ibnos_syscall(SYSCALL_GET_THREADLOCAL_STORAGE_BASE);
+		return (void *)ibnos_syscall(SYSCALL_GET_THREADLOCAL_STORAGE_BASE);
 	}
 
 	static inline uint32_t getTLSLength()
 	{
 		return ibnos_syscall(SYSCALL_GET_THREADLOCAL_STORAGE_LENGTH);
+	}
+
+	static inline void *getProgramArguments()
+	{
+		return (void *)ibnos_syscall(SYSCALL_GET_PROGRAM_ARGUMENTS);
+	}
+
+	static inline void *getEnvironmentVariables()
+	{
+		return (void *)ibnos_syscall(SYSCALL_GET_ENVIRONMENT_VARIABLES);
 	}
 
 	/* malloc, free and fork are also provided by the libc */

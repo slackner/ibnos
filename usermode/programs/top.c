@@ -1,6 +1,3 @@
-#include "programs.h"
-#include <stdio.h>
-#include <string.h>
 /*
  * Copyright (c) 2014, Michael Müller
  * Copyright (c) 2014, Sebastian Lackner
@@ -28,6 +25,8 @@
  *
  */
 
+#include <stdio.h>
+#include <string.h>
 #include <syscall.h>
 #include <process/process.h>
 
@@ -46,7 +45,7 @@ static inline char *__byteSizeMem(unsigned int size, char *buf, int length)
 	return buf;
 }
 
-int cmdTop(UNUSED char **argv, UNUSED int argc)
+int main(UNUSED int argc, UNUSED char **argv)
 {
 	struct processInfo processInfo[1024], *info;
 	unsigned int numProcesses;

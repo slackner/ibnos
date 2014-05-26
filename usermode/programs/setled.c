@@ -25,12 +25,11 @@
  *
  */
 
-#include "programs.h"
 #include <stdio.h>
 #include <string.h>
 #include <syscall.h>
 
-int cmdSetLED(char **argv, int argc)
+int main(int argc, char **argv)
 {
 	bool scroll = false, num = false, caps = false;
 	int i;

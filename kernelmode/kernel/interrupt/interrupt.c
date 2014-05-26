@@ -38,6 +38,7 @@
 #include <process/timer.h>
 #include <process/filesystem.h>
 
+#include <loader/elf.h>
 #include <console/console.h>
 #include <util/util.h>
 #include <syscall.h>
@@ -242,12 +243,149 @@ uint32_t interrupt_0x80(UNUSED uint32_t interrupt, UNUSED uint32_t error, struct
 			}
 			break;
 
+		case SYSCALL_EXECUTE_PROGRAM:
+			{
+				struct file *f = fileSystemIsValidFile(handleGet(&p->handles, t->task.ebx));
+				if (f)
+				{
+					struct thread *old_t, *__old_t;
+					struct process old_p;
+					struct taskContext *task;
+					struct userMemory k2;
+
+					assert(p->pageDirectory);
+					assert(!t->blocked);
+					assert(t->process == p);
+
+					/* backup and reset pageDirectory */
+					old_p.pageDirectory = p->pageDirectory;
+					memcpy(old_p.pageTables, p->pageTables, sizeof(p->pageTables));
+					old_p.entryPoint	= p->entryPoint;
+					p->pageDirectory = NULL;
+
+					/* realloc paging table */
+					pagingAllocProcessPageTable(p);
+					pagingMapRemoteMemory(p, NULL, (void *)USERMODE_KERNELSTACK_ADDRESS, kernelStack, 1, true, false);							/* kernelstack */
+					pagingMapRemoteMemory(p, NULL, (void *)USERMODE_GDT_ADDRESS, (void *)USERMODE_GDT_ADDRESS, GDT_MAX_PAGES, false, false);	/* gdt */
+					pagingMapRemoteMemory(p, NULL, (void *)USERMODE_IDT_ADDRESS, (void *)USERMODE_IDT_ADDRESS, 1, false, false);				/* idt */
+					pagingMapRemoteMemory(p, NULL, (void *)USERMODE_INTJMP_ADDRESS, intJmpTable_user, 1, false, false);							/* intjmp */
+					pagingMapRemoteMemory(p, NULL, (void *)USERMODE_TASK_ADDRESS, (void *)USERMODE_TASK_ADDRESS, 1, false, false);				/* task */
+
+					/* load target process */
+					if (!elfLoadBinary(p, f->buffer, f->size))
+					{
+						pagingReleaseProcessPageTable(p);
+						p->pageDirectory	= old_p.pageDirectory;
+						memcpy(p->pageTables, old_p.pageTables, sizeof(p->pageTables));
+						p->entryPoint		= old_p.entryPoint;
+						break;
+					}
+
+					/* make commandline arguments available in new process */
+					if (ACCESS_USER_MEMORY(&k2, &old_p, (void *)t->task.ecx, t->task.edx, true))
+					{
+						p->user_programArgumentsLength	= (t->task.edx + PAGE_MASK) >> PAGE_BITS;
+						p->user_programArgumentsBase	= pagingTryAllocatePhysMem(p, p->user_programArgumentsLength, true, true); 
+						if (p->user_programArgumentsBase && ACCESS_USER_MEMORY(&k, p, p->user_programArgumentsBase, t->task.edx, true))
+						{
+							memcpy(k.addr, k2.addr, t->task.edx);
+							RELEASE_USER_MEMORY(&k);
+						}
+						RELEASE_USER_MEMORY(&k2);
+					}
+					else
+					{
+						p->user_programArgumentsLength	= 0;
+						p->user_programArgumentsBase	= NULL;
+					}
+
+					/* make environment variables available in new process */
+					if (ACCESS_USER_MEMORY(&k2, &old_p, (void *)t->task.esi, t->task.edi, true))
+					{
+						
+						p->user_environmentVariablesLength	= (t->task.edi + PAGE_MASK) >> PAGE_BITS;
+						p->user_environmentVariablesBase	= pagingTryAllocatePhysMem(p, p->user_environmentVariablesLength, true, true); 
+						if (p->user_environmentVariablesBase && ACCESS_USER_MEMORY(&k, p, p->user_environmentVariablesBase, t->task.edi, true))
+						{
+							memcpy(k.addr, k2.addr, t->task.edi);
+							RELEASE_USER_MEMORY(&k);
+						}
+						RELEASE_USER_MEMORY(&k2);
+					}
+					else
+					{
+						p->user_environmentVariablesLength	= 0;	
+						p->user_environmentVariablesBase	= NULL;
+					}
+
+					/* free paging table of old process */
+					pagingReleaseProcessPageTable(&old_p);
+
+					/* shutdown all other threads */
+					LL_FOR_EACH_SAFE(old_t, __old_t, &p->threads, struct thread, entry_process)
+					{
+						if (t != old_t) objectShutdown(old_t, -3);
+					}
+
+					/* reinitialize the thread t */
+					t->fpuInitialized = false;
+
+					t->user_ring3StackLength	= DEFAULT_STACK_SIZE >> PAGE_BITS;
+					t->user_ring3StackBase		= pagingAllocatePhysMem(p, t->user_ring3StackLength, true, true);
+
+					t->user_threadLocalLength	= DEFAULT_TLB_SIZE >> PAGE_BITS;
+					t->user_threadLocalBase		= pagingAllocatePhysMem(p, t->user_threadLocalLength, true, true);
+
+					/* initialize the cpu registers */
+					task = &t->task;
+					memset(task, 0, sizeof(*task));
+					task->prevTask	= 0;
+					task->esp0		= USERMODE_KERNELSTACK_LIMIT;
+					task->ss0		= gdtGetEntryOffset(dataRing0, GDT_CPL_RING0);
+					task->esp1		= 0;
+					task->ss1		= 0;
+					task->esp2		= 0;
+					task->ss2		= 0;
+					task->cr3		= pagingGetPhysMem(NULL, p->pageDirectory) << PAGE_BITS;
+					task->eip		= (uint32_t)p->entryPoint;
+					task->eflags	= (1 << 9); /* Enable interrupts */
+
+					task->eax		= 0;
+					task->ecx		= 0;
+					task->edx		= 0;
+					task->ebx		= 0;
+					task->esp		= (uint32_t)t->user_ring3StackBase + (t->user_ring3StackLength << PAGE_BITS);
+					task->ebp		= 0;
+					task->esi		= 0;
+					task->edi		= 0;
+					task->es		= gdtGetEntryOffset(dataRing3, GDT_CPL_RING3);
+					task->cs		= gdtGetEntryOffset(codeRing3, GDT_CPL_RING3);
+					task->ss		= gdtGetEntryOffset(dataRing3, GDT_CPL_RING3);
+					task->ds		= gdtGetEntryOffset(dataRing3, GDT_CPL_RING3);
+					task->fs		= gdtGetEntryOffset(dataRing3, GDT_CPL_RING3);
+					task->gs		= gdtGetEntryOffset(dataRing3, GDT_CPL_RING3);
+					task->ldt		= 0;
+					task->iomap		= sizeof(*task);
+
+					/* process has now been replaced! */
+				}
+			}
+			break;
+
 		case SYSCALL_GET_THREADLOCAL_STORAGE_BASE:
 			t->task.eax = (uint32_t)t->user_threadLocalBase;
 			break;
 
 		case SYSCALL_GET_THREADLOCAL_STORAGE_LENGTH:
 			t->task.eax = t->user_threadLocalLength << PAGE_BITS;
+			break;
+
+		case SYSCALL_GET_PROGRAM_ARGUMENTS:
+			t->task.eax = (uint32_t)p->user_programArgumentsBase;
+			break;
+
+		case SYSCALL_GET_ENVIRONMENT_VARIABLES:
+			t->task.eax = (uint32_t)p->user_environmentVariablesBase;
 			break;
 
 		case SYSCALL_ALLOCATE_MEMORY:

@@ -92,7 +92,7 @@ void fpuInit()
  *
  * @return Kernel process object
  */
-struct process *loadELFModule(void *addr, int length)
+struct process *loadELFModule(void *addr, uint32_t length)
 {
 	struct process *p;
 	struct thread *t = NULL;
@@ -130,11 +130,19 @@ void kernel_main(multiboot_info_t *bootInfo)
 	struct pipe *stdin;
 
 	consoleClear();
-	//consoleShowHardwareCursor(false);
 
 	assert(sizeof(struct taskContext) == 0x68);
 	assert(sizeof(struct fpuContext) == 0x6C);
 	assert(offsetof(struct taskContext, eip) == 0x20);
+
+	/* ensure that GRUB loaded a usermode process */
+	assert((bootInfo->flags & MULTIBOOT_INFO_MODS));
+	assert(bootInfo->mods_count >= 2);
+
+	/* ensure that entry is valid */
+	module = (multiboot_module_t *)bootInfo->mods_addr;
+	assert(module[0].mod_start && module[0].mod_start < module[0].mod_end);
+	assert(module[1].mod_start && module[1].mod_start < module[1].mod_end);
 
 	/* Initialize kernel modules - NOTE: the order is important */
 	physMemInit(bootInfo);
@@ -152,15 +160,7 @@ void kernel_main(multiboot_info_t *bootInfo)
 	picInit(0x20);
 	keyboardInit(&stdin->obj);
 	timerInit();
-	fileSystemInit();
-
-	/* ensure that GRUB loaded a usermode process */
-	assert((bootInfo->flags & MULTIBOOT_INFO_MODS));
-	assert(bootInfo->mods_count >= 1);
-
-	/* ensure that entry is valid */
-	module = (multiboot_module_t *)bootInfo->mods_addr;
-	assert(module[0].mod_start && module[0].mod_start < module[0].mod_end);
+	fileSystemInit((void*)module[1].mod_start, module[1].mod_end - module[1].mod_start);
 
 	/* load init process */
 	initProcess = loadELFModule((void*)module[0].mod_start, module[0].mod_end - module[0].mod_start);

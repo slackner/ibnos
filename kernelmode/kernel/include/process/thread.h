@@ -70,6 +70,9 @@
 		struct fpuContext fpu;
 	};
 
+	#define DEFAULT_STACK_SIZE	0x10000
+	#define DEFAULT_TLB_SIZE	0x1000
+
 	struct thread *threadCreate(struct process *p, struct thread *original, void *eip);
 	struct thread *threadRun(struct thread *t);
 	void threadRelease(struct thread *t);

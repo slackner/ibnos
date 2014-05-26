@@ -78,6 +78,14 @@ struct processInfo
 		/* entryPoint of main thread */
 		void *entryPoint;
 
+		/* program arguments in user space */
+		void *user_programArgumentsBase;
+		uint32_t user_programArgumentsLength; /* in pages */
+
+		/* envirionment variables in user space */
+		void *user_environmentVariablesBase;
+		uint32_t user_environmentVariablesLength; /* in pages */
+
 		/* handles */
 		struct handleTable handles;
 	};

@@ -25,13 +25,4 @@
  *
  */
 
-typedef int (*cmd_function)(char **argv, int argc);
-
-struct command
-{
-	char* cmd;
-	cmd_function func;
-	char* help;
-};
-
 void shell();

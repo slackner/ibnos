@@ -25,14 +25,13 @@
  *
  */
 
-#include "programs.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <syscall.h>
 
 #define UNUSED __attribute__((unused))
 
-int cmdWordcount(UNUSED char **argv, UNUSED int argc)
+int main(UNUSED int argc, UNUSED char **argv)
 {
 	char buffer[1024];
 	int result, i, count = 0;

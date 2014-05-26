@@ -35,7 +35,6 @@
 #include <unistd.h>
 #include <assert.h>
 #include "syscall.h"
-#include "programs/programs.h"
 #include "vconsole.h"
 #include <console/console.h>
 
@@ -55,19 +54,6 @@ char welcomeMSG[] =
 	"\n"
 	" Type help for a list of available commands.\n";
 
-static int cmdHelp(char **argv, int argc);
-
-struct command commands[] =
-{
-	{"echo",	cmdEcho,		"Echo parameters"},
-	{"help",	cmdHelp,		"Show help"},
-	{"setled",	cmdSetLED,		"Toggle keyboard LEDs"},
-	{"test",	cmdTest,		"Run a system self-test"},
-	{"top",		cmdTop,			"Print information about running processes"},
-	{"wc",		cmdWordcount,	"Count the number of words"},
-};
-
-
 enum parserState
 {
 	STATE_BLANK = 0,
@@ -76,14 +62,6 @@ enum parserState
 	STATE_ESCAPE,
 	STATE_QUOTE_ESCAPE,
 };
-
-static int cmdHelp(UNUSED char **argv, UNUSED int argc)
-{
-	for (unsigned int i = 0; i < sizeof(commands) / sizeof(commands[0]); i++)
-		printf("%-10s %s\n", commands[i].cmd, commands[i].help);
-
-	return 0;
-}
 
 static uint32_t shellParseArgs(char *str, char **args, uint32_t maxArgs)
 {
@@ -303,29 +281,8 @@ static char *shellInput()
 	return buffer;
 }
 
-static struct command *shellFindCommand(char *cmd)
+static void shellRunCommand(char **argv)
 {
-	uint32_t i;
-
-	if (!cmd)
-	{
-		printf("Missing command argument!\n");
-		return NULL;
-	}
-
-	for (i = 0; i < sizeof(commands)/sizeof(commands[0]); i++)
-	{
-		if (!strcmp(commands[i].cmd, cmd))
-			return &commands[i];
-	}
-
-	printf("Command %s not found!\n", cmd);
-	return NULL;
-}
-
-static void shellRunCommand(char **args, uint32_t count)
-{
-	uint32_t i = 0;
 	int32_t out_pipe, in_pipe = 0;
 	uint32_t expectedEvents = 0;
 	int32_t exitcode = -1;
@@ -335,20 +292,16 @@ static void shellRunCommand(char **args, uint32_t count)
 	event = createEvent(true);
 	if (event < 0) return;
 
-	while (i < count)
+	while (*argv)
 	{
 		pid_t pid;
-		uint32_t argc;
-		char **argv = args + i;
-		struct command *cmd = shellFindCommand(argv[0]);
-		if (!cmd) break;
 
 		/* determine number of arguments */
-		argc = 1;
-		while (i + argc < count && argv[argc]) argc++;
+		uint32_t argc = 1;
+		while (argv[argc]) argc++;
 
 		/* create output pipe if necessary */
-		out_pipe = (i + argc < count) ? createPipe() : 1;
+		out_pipe = argv[argc + 1] ? createPipe() : 1;
 
 		pid = fork();
 		if (pid < 0) break;
@@ -358,7 +311,9 @@ static void shellRunCommand(char **args, uint32_t count)
 			/* forward stdin/stdout */
 			if (in_pipe != 0)  dup2(in_pipe, 0);
 			if (out_pipe != 1) dup2(out_pipe, 1);
-			exit(cmd->func(argv, argc));
+
+			execve(argv[0], argv, NULL);
+			exit(127);
 		}
 
 		/* register notifcation for all processes */
@@ -367,7 +322,7 @@ static void shellRunCommand(char **args, uint32_t count)
 		expectedEvents++;
 
 		in_pipe = out_pipe;
-		i += argc + 1;
+		argv += (argc + 1);
 	}
 
 	/* wait for termination of all processes */
@@ -418,10 +373,11 @@ void shell()
 		/* did the user enter anything at all? */
 		if (line[0] != '\n')
 		{
-			char *args[MAX_ARGS];
+			char *args[MAX_ARGS + 2];
 			uint32_t count = shellParseArgs(line, args, MAX_ARGS);
 			if (count <= 0) break;
-			shellRunCommand(args, count);
+			args[count + 1] = args[count] = NULL;
+			shellRunCommand(args);
 		}
 
 		/* free line again */

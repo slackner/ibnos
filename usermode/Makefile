@@ -1,16 +1,19 @@
 include config.mk
 
 SOURCE		= $(wildcard *.c)
-DIR_OBJECTS = $(SOURCE:.c=.o)
-OBJECTS		= $(shell find . -mindepth 2 -iname "*.o" -not -path "./libc/*" -not -path "./system/*")
+OBJECTS 	= $(SOURCE:.c=.o)
+EXECUTABLES = $(shell find . -mindepth 2 -iname "*.exe" -not -path "./libc/*" -not -path "./system/*")
 SUBDIRS		= $(dir $(wildcard */Makefile))
 
 .PHONY: all
-all: init.user
+all: init.user rootfs.tar
 
-init.user: $(SUBDIRS) $(OBJECTS) $(DIR_OBJECTS)
+init.user: $(SUBDIRS) $(OBJECTS)
 	echo $(OBJECTS)
-	$(CC) $(CFLAGS) -o init.user $(OBJECTS) $(DIR_OBJECTS) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o init.user $(OBJECTS) $(LDFLAGS)
+
+rootfs.tar: $(SUBDIRS) $(EXECUTABLES)
+	tar --transform 's,^\./[^/]*/,/bin/,' -c -f rootfs.tar $(EXECUTABLES)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -MMD -MP -o $@ -c $<
