@@ -12,7 +12,7 @@ int getdents(int fd, struct dirent *dirp, int count)
 	ret = objectRead(fd, dirp->d_name, sizeof(dirp->d_name));
 	if (ret < 0) return 0;
 
-	dirp->d_ino		= 0;
+	dirp->d_ino		= 1;
 	dirp->d_off		= sizeof(*dirp);
 	dirp->d_reclen	= sizeof(*dirp);
 	return sizeof(*dirp);
