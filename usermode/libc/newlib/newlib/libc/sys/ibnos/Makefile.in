@@ -71,18 +71,18 @@ lib_a_AR = $(AR) $(ARFLAGS)
 lib_a_LIBADD =
 am_lib_a_OBJECTS = lib_a-chown.$(OBJEXT) lib_a-close.$(OBJEXT) \
 	lib_a-execve.$(OBJEXT) lib_a-fork.$(OBJEXT) \
-	lib_a-fstat.$(OBJEXT) lib_a-getenv.$(OBJEXT) \
-	lib_a-getpid.$(OBJEXT) lib_a-gettod.$(OBJEXT) \
-	lib_a-isatty.$(OBJEXT) lib_a-kill.$(OBJEXT) \
-	lib_a-link.$(OBJEXT) lib_a-lseek.$(OBJEXT) \
-	lib_a-open.$(OBJEXT) lib_a-read.$(OBJEXT) \
-	lib_a-readlink.$(OBJEXT) lib_a-malloc.$(OBJEXT) \
-	lib_a-stat.$(OBJEXT) lib_a-symlink.$(OBJEXT) \
-	lib_a-times.$(OBJEXT) lib_a-unlink.$(OBJEXT) \
-	lib_a-wait.$(OBJEXT) lib_a-write.$(OBJEXT) \
-	lib_a-liballoc.$(OBJEXT) lib_a-reent.$(OBJEXT) \
-	lib_a-_exit.$(OBJEXT) lib_a-helper.$(OBJEXT) \
-	lib_a-dup.$(OBJEXT) lib_a-pipe.$(OBJEXT)
+	lib_a-fstat.$(OBJEXT) lib_a-getpid.$(OBJEXT) \
+	lib_a-gettod.$(OBJEXT) lib_a-isatty.$(OBJEXT) \
+	lib_a-kill.$(OBJEXT) lib_a-link.$(OBJEXT) \
+	lib_a-lseek.$(OBJEXT) lib_a-open.$(OBJEXT) \
+	lib_a-read.$(OBJEXT) lib_a-readlink.$(OBJEXT) \
+	lib_a-malloc.$(OBJEXT) lib_a-stat.$(OBJEXT) \
+	lib_a-symlink.$(OBJEXT) lib_a-times.$(OBJEXT) \
+	lib_a-unlink.$(OBJEXT) lib_a-wait.$(OBJEXT) \
+	lib_a-write.$(OBJEXT) lib_a-liballoc.$(OBJEXT) \
+	lib_a-reent.$(OBJEXT) lib_a-_exit.$(OBJEXT) \
+	lib_a-helper.$(OBJEXT) lib_a-dup.$(OBJEXT) \
+	lib_a-pipe.$(OBJEXT)
 lib_a_OBJECTS = $(am_lib_a_OBJECTS)
 libdummy_a_AR = $(AR) $(ARFLAGS)
 libdummy_a_LIBADD =
@@ -212,7 +212,7 @@ AUTOMAKE_OPTIONS = cygnus
 INCLUDES = $(NEWLIB_CFLAGS) $(CROSS_CFLAGS) $(TARGET_CFLAGS)
 AM_CCASFLAGS = $(INCLUDES)
 noinst_LIBRARIES = lib.a libdummy.a
-lib_a_SOURCES = chown.c close.c execve.c fork.c fstat.c getenv.c \
+lib_a_SOURCES = chown.c close.c execve.c fork.c fstat.c \
 	getpid.c gettod.c isatty.c kill.c link.c lseek.c open.c \
 	read.c readlink.c malloc.c stat.c symlink.c times.c unlink.c \
 	wait.c write.c liballoc.c reent.c _exit.c helper.c dup.c pipe.c
@@ -327,12 +327,6 @@ lib_a-fstat.o: fstat.c
 
 lib_a-fstat.obj: fstat.c
 	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-fstat.obj `if test -f 'fstat.c'; then $(CYGPATH_W) 'fstat.c'; else $(CYGPATH_W) '$(srcdir)/fstat.c'; fi`
-
-lib_a-getenv.o: getenv.c
-	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-getenv.o `test -f 'getenv.c' || echo '$(srcdir)/'`getenv.c
-
-lib_a-getenv.obj: getenv.c
-	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-getenv.obj `if test -f 'getenv.c'; then $(CYGPATH_W) 'getenv.c'; else $(CYGPATH_W) '$(srcdir)/getenv.c'; fi`
 
 lib_a-getpid.o: getpid.c
 	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-getpid.o `test -f 'getpid.c' || echo '$(srcdir)/'`getpid.c

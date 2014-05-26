@@ -8,7 +8,7 @@ AM_CCASFLAGS = $(INCLUDES)
 
 noinst_LIBRARIES = lib.a libdummy.a
 
-lib_a_SOURCES = chown.c close.c execve.c fork.c fstat.c getenv.c \
+lib_a_SOURCES = chown.c close.c execve.c fork.c fstat.c \
 	getpid.c gettod.c isatty.c kill.c link.c lseek.c open.c \
 	read.c readlink.c malloc.c stat.c symlink.c times.c unlink.c \
 	wait.c write.c liballoc.c reent.c _exit.c helper.c dup.c pipe.c

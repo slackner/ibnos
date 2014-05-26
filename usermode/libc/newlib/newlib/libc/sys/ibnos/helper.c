@@ -5,18 +5,7 @@
 #include <stdbool.h>
 #include "syscall.h"
 
-void __init_ibnos_thread()
-{
-	struct _reent *reent = __getreent();
-	_REENT_INIT_PTR(reent);
-	__sinit(reent);
-}
-
-void __init_ibnos()
-{
-	__sinit(_GLOBAL_REENT);
-	__init_ibnos_thread();
-}
+extern char **environ;
 
 char **__get_ibnos_argv()
 {
@@ -87,4 +76,19 @@ char **__get_ibnos_envp()
 	}
 
 	return (char **)buf_envp;
+}
+
+void __init_ibnos_thread()
+{
+	struct _reent *reent = __getreent();
+	_REENT_INIT_PTR(reent);
+	__sinit(reent);
+}
+
+void __init_ibnos()
+{
+	__sinit(_GLOBAL_REENT);
+	__init_ibnos_thread();
+	char** tmpEnv = __get_ibnos_envp();
+	if (tmpEnv) environ = tmpEnv;
 }
