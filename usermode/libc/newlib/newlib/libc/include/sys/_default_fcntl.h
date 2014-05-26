@@ -22,6 +22,7 @@ extern "C" {
 #define	_FNONBLOCK	0x4000	/* non blocking I/O (POSIX style) */
 #define	_FNDELAY	_FNONBLOCK	/* non blocking I/O (4.2 style) */
 #define	_FNOCTTY	0x8000	/* don't assign a ctty on this open */
+#define _FDIRECTORY	0x10000
 
 #define	O_ACCMODE	(O_RDONLY|O_WRONLY|O_RDWR)
 
@@ -42,6 +43,7 @@ extern "C" {
 /*	O_NDELAY	_FNBIO 		set in include/fcntl.h */
 #define	O_NONBLOCK	_FNONBLOCK
 #define	O_NOCTTY	_FNOCTTY
+#define O_DIRECTORY	_FDIRECTORY
 /* For machines which care - */
 #if defined (_WIN32) || defined (__CYGWIN__)
 #define _FBINARY        0x10000

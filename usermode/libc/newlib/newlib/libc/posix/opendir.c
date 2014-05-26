@@ -54,7 +54,7 @@ _DEFUN(opendir, (name),
 	register int fd;
 	int rc = 0;
 
-	if ((fd = open(name, 0)) == -1)
+	if ((fd = open(name, O_DIRECTORY)) == -1)
 		return NULL;
 #ifdef HAVE_FCNTL
 	rc = fcntl(fd, F_SETFD, 1);
