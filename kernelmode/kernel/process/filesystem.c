@@ -904,8 +904,6 @@ void fileSystemInit(void *addr, uint32_t length)
 
 		if (!tar->typeflag || tar->typeflag == TAR_TYPE_FILE)
 		{
-
-			tar->name[sizeof(tar->name) - 1] = 0;
 			f = fileSystemSearchFile(0, namebuf, stringLength(namebuf), true);
 			assert(f);
 
