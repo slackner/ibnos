@@ -13,7 +13,7 @@ init.user: $(SUBDIRS) $(OBJECTS)
 	$(CC) $(CFLAGS) -o init.user $(OBJECTS) $(LDFLAGS)
 
 rootfs.tar: $(SUBDIRS) $(EXECUTABLES)
-	tar --transform 's,^\./[^/]*/,/bin/,' -c -f rootfs.tar $(EXECUTABLES)
+	tar --transform 's,^\./[^/]*/\(.*\)\.exe,/bin/\1,' -c -f rootfs.tar $(EXECUTABLES)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -MMD -MP -o $@ -c $<
