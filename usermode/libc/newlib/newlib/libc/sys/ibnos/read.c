@@ -23,6 +23,6 @@ _ssize_t _read_r(struct _reent *eptr, int file, void *ptr, size_t len)
 		objectWait(file, 0);
 	}
 
-	eptr->_errno = (ret < 0) ? EPIPE : 0;
-	return ret;
+	eptr->_errno = 0;
+	return (ret > 0) ? ret : 0;
 }
