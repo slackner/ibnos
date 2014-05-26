@@ -141,6 +141,14 @@ enum
 	 * 				- Pointer to the argument array (if any)
 	 */
 	SYSCALL_GET_PROGRAM_ARGUMENTS_BASE,
+
+	/**
+	 * Get the length of the memory section reserved for the argument array.
+	 * - \b Parameters:
+	 * 				None
+	 * - \b Returns:
+	 * 				- Length in bytes
+	 */
 	SYSCALL_GET_PROGRAM_ARGUMENTS_LENGTH,
 
 	/**
@@ -152,6 +160,14 @@ enum
 	 * 				- Pointer to the environment variable array (if any)
 	 */
 	SYSCALL_GET_ENVIRONMENT_VARIABLES_BASE,
+
+	/**
+	 * Get the length of the memory section reserved for the environment variables.
+	 * - \b Parameters:
+	 * 				None
+	 * - \b Returns:
+	 * 				- Length in bytes
+	 */
 	SYSCALL_GET_ENVIRONMENT_VARIABLES_LENGTH,
 
 	/**
