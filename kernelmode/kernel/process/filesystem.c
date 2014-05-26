@@ -571,7 +571,7 @@ static void __openedFileShutdown(struct object *obj, UNUSED uint32_t mode)
 		if (f->isHeap && f->buffer)
 		{
 			uint8_t *new_buffer = heapReAlloc(f->buffer, h->pos);
-			if (new_buffer) f->buffer = new_buffer;
+			if (new_buffer || !h->pos) f->buffer = new_buffer;
 		}
 
 		/* define new size */
@@ -619,6 +619,7 @@ static int32_t __openedFileWrite(struct object *obj, uint8_t *buf, uint32_t leng
 {
 	struct openedFile *h = objectContainer(obj, struct openedFile, &openedFileFunctions);
 	struct file *f = h->file;
+	if (length == 0) return 0;
 
 	/* reallocate file memory */
 	if (h->pos + length > f->size)
