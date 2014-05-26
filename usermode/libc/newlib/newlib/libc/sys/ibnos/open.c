@@ -14,7 +14,7 @@ int _open_r(struct _reent *ptr, const char *file, int flags, int mode)
 	fileobj = filesystemSearchFile(-1, file, strlen(file), (flags & O_CREAT));
 	if (fileobj < 0)
 	{
-		ptr->_errno = EACCES;
+		ptr->_errno = ENOENT;
 		return -1;
 	}
 

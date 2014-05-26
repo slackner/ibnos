@@ -15,7 +15,7 @@ int _execve_r(struct _reent *ptr, const char *name, char *const *argv, char *con
 	fileobj = filesystemSearchFile(-1, name, strlen(name), false);
 	if (fileobj < 0)
 	{
-		ptr->_errno = EACCES;
+		ptr->_errno = ENOENT;
 		return -1;
 	}
 
@@ -70,6 +70,6 @@ int _execve_r(struct _reent *ptr, const char *name, char *const *argv, char *con
 
 	objectClose(fileobj);
 
-	ptr->_errno = (ret >= 0) ? 0 : EACCES;
+	ptr->_errno = (ret >= 0) ? 0 : ENOEXEC;
 	return ret;
 }
