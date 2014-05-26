@@ -119,6 +119,9 @@ bool elfLoadBinary(struct process *p, void *addr, uint32_t length)
 	struct linkedList pages = LL_INIT( pages );
 	struct requiredPages *it, *__it;
 
+	if (length < header->shoff)
+		return false;
+
 	section = (struct elfSectionTable *)((void*)header + header->shoff);
 	for (uint32_t index = 0; index < header->shnum; index++)
 	{
@@ -129,6 +132,9 @@ bool elfLoadBinary(struct process *p, void *addr, uint32_t length)
 
 		if (!section->addr)
 			continue;
+
+		if (section->type != ELF_STYPE_NOBITS && length < ((uint64_t)section->offset + section->size))
+			return false;
 
 		uint32_t startIndex	= section->addr >> PAGE_BITS;
 		uint32_t stopIndex	= ((uint64_t)section->addr + section->size + PAGE_MASK) >> PAGE_BITS;
