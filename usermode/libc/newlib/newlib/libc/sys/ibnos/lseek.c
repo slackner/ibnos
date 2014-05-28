@@ -33,5 +33,6 @@ off_t _lseek_r(struct _reent *ptr, int file, off_t pos, int whence)
 
 	ret = objectSignal(file, pos);
 	ptr->_errno = (ret < 0) ? EINVAL : 0;
-	return ret;
+
+	return (ret < 0) ? -1 : pos;
 }

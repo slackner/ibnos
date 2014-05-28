@@ -35,10 +35,3 @@ int _stat_r(struct _reent *ptr, const char *__restrict file, struct stat *__rest
 	ptr->_errno = ENOENT;
 	return -1;
 }
-
-int _fstat_r(struct _reent *ptr, int file, struct stat *st)
-{
-	ptr->_errno = 0;
-	st->st_mode = S_IFCHR;
-	return 0;
-}

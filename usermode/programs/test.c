@@ -599,7 +599,7 @@ DECLARE_TEST_FUNC(file)
 	size_t buflen = 0;
 	char tmpbuf[64];
 
-	f = fopen("/test.txt", "r");
+	f = fopen("/test.txt", "rb");
 	ok(f == NULL);
 
 	f = fopen("/test.txt", "wb");
@@ -619,7 +619,9 @@ DECLARE_TEST_FUNC(file)
 	tmpbuf[5] = 0;
 	ok(!strcmp(tmpbuf, "First"));
 
+	ok(ftell(f) == 5);
 	ok(fseek(f, 0, SEEK_SET) == 0);
+	ok(ftell(f) == 0);
 
 	res = __getline(&buf, &buflen, f);
 	ok(res != -1);
@@ -630,6 +632,22 @@ DECLARE_TEST_FUNC(file)
 	ok(res != -1);
 	buf[res] = 0;
 	ok(!strcmp(buf, "Second line\n"));
+
+	res = __getline(&buf, &buflen, f);
+	ok(res != -1);
+	buf[res] = 0;
+	ok(!strcmp(buf, "Third line"));
+
+	ok(fseek(f, -10, SEEK_END) == 0);
+	ok(ftell(f) == 23);
+
+	res = __getline(&buf, &buflen, f);
+	ok(res != -1);
+	buf[res] = 0;
+	ok(!strcmp(buf, "Third line"));
+
+	ok(fseek(f, -10, SEEK_CUR) == 0);
+	ok(ftell(f) == 23);
 
 	res = __getline(&buf, &buflen, f);
 	ok(res != -1);
